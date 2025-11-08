@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>C2 Control Panel</title>
+</head>
+<body>
+    <h1>C2 Control Panel</h1>
+    <form action="/command" method="post">
+        <label for="target">Target Machine:</label>
+        <select id="target" name="target">
+            <option value="machine1">Machine 1</option>
+            <option value="machine2">Machine 2</option>
+            <!-- Añade más opciones según las máquinas infectadas -->
+        </select>
+        <br>
+        <label for="cmd">Command:</label>
+        <input type="text" id="cmd" name="cmd">
+        <br>
+        <input type="submit" value="Send Command">
+    </form>
+</body>
+</html>
