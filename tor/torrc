@@ -1,0 +1,12 @@
+# Configuración Tor para Higurama Botnet
+# SOCKS5 Proxy para el bot
+SocksPort 9050
+
+# Logs (opcional, comentar en producción)
+Log notice file C:\Users\Rubir\Downloads\mirai\tor\tor.log
+
+# Sin avisos de controlador
+DisableDebuggerAttachment 0
+
+# Cliente Tor solamente (no relay)
+ClientOnly 1
