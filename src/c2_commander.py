@@ -18,7 +18,7 @@ except ImportError:
     # Fallback si no existe banner.py
     CUSTOM_BANNER = r"""
     ╔═══════════════════════════════════════════════════════════╗
-    ║                   C2 COMMAND CENTER                       ║
+    ║                   C2 Higurama                    ║
     ╚═══════════════════════════════════════════════════════════╝
     """
     def center_ascii(text):

