@@ -1,0 +1,97 @@
+version: '3.8'
+
+services:
+  # Servidor SSH vulnerable 1
+  vulnerable-ssh-1:
+    image: ubuntu:20.04
+    container_name: vulnerable_ssh_1
+    hostname: victim-01
+    networks:
+      mirai_net:
+        ipv4_address: 172.20.0.10
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: >
+      bash -c "
+      apt update -qq && 
+      DEBIAN_FRONTEND=noninteractive apt install -y openssh-server python3 python3-pip curl &&
+      pip3 install --quiet paramiko netaddr cryptography &&
+      useradd -m -s /bin/bash admin &&
+      echo 'admin:admin' | chpasswd &&
+      sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config &&
+      sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config &&
+      echo 'PermitRootLogin yes' >> /etc/ssh/sshd_config &&
+      echo 'PasswordAuthentication yes' >> /etc/ssh/sshd_config &&
+      mkdir -p /run/sshd &&
+      echo '✓ Container 1 ready (admin:admin) - Python3 & pip installed' &&
+      /usr/sbin/sshd -D
+      "
+    ports:
+      - "2201:22"
+    restart: unless-stopped
+
+  # Servidor SSH vulnerable 2
+  vulnerable-ssh-2:
+    image: ubuntu:20.04
+    container_name: vulnerable_ssh_2
+    hostname: victim-02
+    networks:
+      mirai_net:
+        ipv4_address: 172.20.0.11
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: >
+      bash -c "
+      apt update -qq && 
+      DEBIAN_FRONTEND=noninteractive apt install -y openssh-server python3 python3-pip curl &&
+      pip3 install --quiet paramiko netaddr cryptography &&
+      useradd -m -s /bin/bash test &&
+      echo 'test:test' | chpasswd &&
+      sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config &&
+      sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config &&
+      echo 'PermitRootLogin yes' >> /etc/ssh/sshd_config &&
+      echo 'PasswordAuthentication yes' >> /etc/ssh/sshd_config &&
+      mkdir -p /run/sshd &&
+      echo '✓ Container 2 ready (test:test) - Python3 & pip installed' &&
+      /usr/sbin/sshd -D
+      "
+    ports:
+      - "2202:22"
+    restart: unless-stopped
+
+  # Servidor SSH vulnerable 3 - CORREGIDO
+  vulnerable-ssh-3:
+    image: ubuntu:20.04
+    container_name: vulnerable_ssh_3
+    hostname: victim-03
+    networks:
+      mirai_net:
+        ipv4_address: 172.20.0.12
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: >
+      bash -c "
+      apt update -qq && 
+      DEBIAN_FRONTEND=noninteractive apt install -y openssh-server python3 python3-pip curl &&
+      pip3 install --quiet paramiko netaddr cryptography &&
+      echo 'root:root' | chpasswd &&
+      useradd -m -s /bin/bash user &&
+      echo 'user:password' | chpasswd &&
+      sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config &&
+      sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config &&
+      echo 'PermitRootLogin yes' >> /etc/ssh/sshd_config &&
+      echo 'PasswordAuthentication yes' >> /etc/ssh/sshd_config &&
+      mkdir -p /run/sshd &&
+      echo '✓ Container 3 ready (root:root / user:password) - Python3 & pip installed' &&
+      /usr/sbin/sshd -D
+      "
+    ports:
+      - "2203:22"
+    restart: unless-stopped
+
+networks:
+  mirai_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24

@@ -1,0 +1,110 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+ENV/
+env/
+
+# PyInstaller
+*.manifest
+*.spec
+build/
+dist/
+
+# Compiled Binaries
+bots/windows/
+bots/linux/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# SSL Certificates (NEVER commit private keys!)
+*.pem
+*.key
+*.crt
+*.csr
+
+# Configuration Files with Sensitive Data
+targets.txt
+config_private.json
+
+# Logs
+*.log
+logs/
+c2.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Deployment
+deployment_package/
+
+# Temporary Files
+*.tmp
+*.temp
+tmp/
+temp/
+
+# Personal Notes (don't commit your IPs/credentials!)
+NOTES.txt
+my_servers.txt
+real_targets.txt
+
+# Database Files
+*.db
+*.sqlite
+*.sqlite3
+
+# Compiled Python
+*.pyc
+*.pyo
+
+# Backup Files
+*.bak
+*.backup
+*~
+
+# Archives
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# Large Files
+*.iso
+*.vmdk

