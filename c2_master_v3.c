@@ -18,7 +18,6 @@
 #include <sys/ioctl.h>
 #include <termios.h>
 #include "config.h"
-#include "hunter_commands.h"
 
 #ifndef MAX_BOTS
 #define MAX_BOTS 1000
@@ -91,6 +90,9 @@ typedef struct {
 } Stats;
 
 Stats stats = {0};
+
+// Include hunter commands after structures are defined
+#include "hunter_commands.h"
 
 // ============================================================================
 // ASCII ART & ANIMATIONS
