@@ -4,6 +4,9 @@
 #ifndef SSL_HARDENING_H
 #define SSL_HARDENING_H
 
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 #include <openssl/rand.h>
