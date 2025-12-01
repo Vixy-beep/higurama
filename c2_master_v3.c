@@ -513,9 +513,26 @@ void *handle_bot(void *arg) {
     add_bot(client_sock, ssl, bot_id, ip);
     
     if (bot_index < bot_count) {
-        strncpy(bots[bot_index].hostname, hostname, sizeof(bots[bot_index].hostname) - 1);
-        strncpy(bots[bot_index].arch, arch, sizeof(bots[bot_index].arch) - 1);
-        strncpy(bots[bot_index].type, bot_type, sizeof(bots[bot_index].type) - 1);
+        if (hostname != NULL) {
+            strncpy(bots[bot_index].hostname, hostname, sizeof(bots[bot_index].hostname) - 1);
+            bots[bot_index].hostname[sizeof(bots[bot_index].hostname) - 1] = '\0';
+        } else {
+            strcpy(bots[bot_index].hostname, "unknown");
+        }
+        
+        if (arch != NULL) {
+            strncpy(bots[bot_index].arch, arch, sizeof(bots[bot_index].arch) - 1);
+            bots[bot_index].arch[sizeof(bots[bot_index].arch) - 1] = '\0';
+        } else {
+            strcpy(bots[bot_index].arch, "unknown");
+        }
+        
+        if (bot_type != NULL) {
+            strncpy(bots[bot_index].type, bot_type, sizeof(bots[bot_index].type) - 1);
+            bots[bot_index].type[sizeof(bots[bot_index].type) - 1] = '\0';
+        } else {
+            strcpy(bots[bot_index].type, "unknown");
+        }
     }
     
     // Keep alive loop
