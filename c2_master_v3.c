@@ -18,6 +18,7 @@
 #include <sys/ioctl.h>
 #include <termios.h>
 #include "config.h"
+#include "ssl_hardening.h"
 
 #ifndef MAX_BOTS
 #define MAX_BOTS 1000
