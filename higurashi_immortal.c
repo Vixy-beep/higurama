@@ -430,6 +430,7 @@ int main(int argc, char *argv[]) {
     // Check for --no-daemon flag for testing
     if (argc > 1 && strcmp(argv[1], "--no-daemon") == 0) {
         no_daemon = 1;
+        printf("[DEBUG] Running in NO-DAEMON mode (foreground)\n");
     }
     
     // Daemonizar (doble fork) solo si no está en modo debug
@@ -447,6 +448,8 @@ int main(int argc, char *argv[]) {
         open("/dev/null", O_RDONLY);
         open("/dev/null", O_WRONLY);
         open("/dev/null", O_WRONLY);
+    } else {
+        printf("[*] Skipping daemonization...\n");
     }
     
     // Ignorar señales
