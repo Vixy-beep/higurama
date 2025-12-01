@@ -128,14 +128,24 @@ void get_subnet(const char *ip, char *subnet) {
 
 // Load WiFi networks from Android config (requires root or readable paths)
 void load_wifi_history() {
+    printf("[*] Loading WiFi history database...\n");
+    
     // Try to read WPA supplicant config
     FILE *fp = fopen("/data/misc/wifi/wpa_supplicant.conf", "r");
     if (!fp) {
+        printf("[*] /data/misc/wifi/ not accessible (requires root)\n");
         // Fallback to user-accessible location
         fp = fopen("/sdcard/.wifi_history", "r");
+        if (!fp) {
+            printf("[*] No previous WiFi history found (/sdcard/.wifi_history)\n");
+            printf("[*] History will be created after first network scan\n");
+            return;
+        } else {
+            printf("[+] Loading from /sdcard/.wifi_history\n");
+        }
+    } else {
+        printf("[+] Loading from /data/misc/wifi/wpa_supplicant.conf\n");
     }
-    
-    if (!fp) return;
     
     char line[256];
     char current_ssid[64] = "";
@@ -169,6 +179,8 @@ void load_wifi_history() {
     
     if (known_network_count > 0) {
         printf("[+] Loaded %d known WiFi networks from history\n", known_network_count);
+    } else {
+        printf("[*] No WiFi networks in history database yet\n");
     }
 }
 
