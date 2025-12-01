@@ -19,6 +19,10 @@
 #include <termios.h>
 #include "config.h"
 
+#ifndef MAX_BOTS
+#define MAX_BOTS 1000
+#endif
+
 // ANSI Colors
 #define RESET       "\033[0m"
 #define BOLD        "\033[1m"

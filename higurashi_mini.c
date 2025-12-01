@@ -14,6 +14,7 @@
 #include <time.h>
 #include <sys/utsname.h>
 #include <signal.h>
+#include <sys/stat.h>
 #include <fcntl.h>
 
 #ifndef C2_IP
