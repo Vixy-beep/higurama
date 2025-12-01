@@ -23,7 +23,7 @@ void obfuscate_data(char *data, int len) {
     }
 }
 
-// Configurar SSL con máxima seguridad
+// Configurar SSL con máxima seguridad (compatible)
 SSL_CTX* create_hardened_ssl_ctx(int is_server) {
     SSL_CTX *ctx;
     
@@ -38,17 +38,14 @@ SSL_CTX* create_hardened_ssl_ctx(int is_server) {
         return NULL;
     }
     
-    // Forzar TLS 1.3 únicamente (máxima seguridad)
-    SSL_CTX_set_min_proto_version(ctx, TLS1_3_VERSION);
-    SSL_CTX_set_max_proto_version(ctx, TLS1_3_VERSION);
+    // TLS 1.2+ (compatible con más sistemas)
+    SSL_CTX_set_min_proto_version(ctx, TLS1_2_VERSION);
     
-    // Cipher suites más fuertes
-    SSL_CTX_set_cipher_list(ctx, "TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256");
+    // Cipher suites fuertes pero compatibles
+    SSL_CTX_set_cipher_list(ctx, "HIGH:!aNULL:!MD5:!RC4");
     
     // Deshabilitar verificación de certificados (para bots)
-    if (!is_server) {
-        SSL_CTX_set_verify(ctx, SSL_VERIFY_NONE, NULL);
-    }
+    SSL_CTX_set_verify(ctx, SSL_VERIFY_NONE, NULL);
     
     // Perfect Forward Secrecy
     SSL_CTX_set_options(ctx, SSL_OP_SINGLE_DH_USE | SSL_OP_SINGLE_ECDH_USE);
