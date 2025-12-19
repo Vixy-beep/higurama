@@ -7,7 +7,7 @@ echo "╚═══════════════════════�
 echo ""
 
 # Detectar IP del VPS
-VPS_IP="93.95.231.134"
+VPS_IP="207.244.255.208"
 VPS_PORT="8080"
 
 echo "[*] Descargando binario desde VPS: $VPS_IP:$VPS_PORT"

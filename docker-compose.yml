@@ -1,0 +1,99 @@
+version: '3.8'
+
+services:
+  higurama-c2:
+    build:
+      context: .
+      dockerfile: Dockerfile.c2
+    container_name: higurama-c2
+    hostname: higurama-c2
+    networks:
+      - botnet
+    ports:
+      - "4444:4444"  # Puerto C2
+      - "8000:80"    # Puerto servidor web para binarios
+    volumes:
+      - ./c2_master.c:/opt/higurama/c2_master.c
+      - ./bot_soldier_v2.c:/opt/higurama/bot_soldier_v2.c
+      - ./bot_vivi.c:/opt/higurama/bot_vivi.c
+      - ./config.h:/opt/higurama/config.h
+    privileged: true
+    stdin_open: true
+    tty: true
+
+  iot-camera-1:
+    image: alpine:latest
+    container_name: iot-camera-1
+    hostname: iot-camera-1
+    networks:
+      botnet:
+        ipv4_address: 172.20.0.100
+    ports:
+      - "23"  # Telnet
+    command: >
+      sh -c "apk add --no-cache busybox-extras &&
+             echo -e 'admin:admin' | chpasswd &&
+             busybox telnetd -F -l /bin/sh"
+
+  iot-router-1:
+    image: alpine:latest
+    container_name: iot-router-1
+    hostname: iot-router-1
+    networks:
+      botnet:
+        ipv4_address: 172.20.0.101
+    ports:
+      - "22"  # SSH
+    command: >
+      sh -c "apk add --no-cache openssh &&
+             echo -e 'root:root' | chpasswd &&
+             sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config &&
+             ssh-keygen -A &&
+             /usr/sbin/sshd -D"
+
+  iot-dvr-1:
+    image: alpine:latest
+    container_name: iot-dvr-1
+    hostname: iot-dvr-1
+    networks:
+      botnet:
+        ipv4_address: 172.20.0.102
+    ports:
+      - "23"  # Telnet
+    command: >
+      sh -c "apk add --no-cache busybox-extras &&
+             echo -e 'admin:12345' | chpasswd &&
+             busybox telnetd -F -l /bin/sh"
+
+  iot-tv-1:
+    image: alpine:latest
+    container_name: iot-tv-1
+    hostname: iot-tv-1
+    networks:
+      botnet:
+        ipv4_address: 172.20.0.103
+    ports:
+      - "22"  # SSH
+    command: >
+      sh -c "apk add --no-cache openssh &&
+             echo -e 'user:password' | chpasswd &&
+             adduser -D user &&
+             sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config &&
+             ssh-keygen -A &&
+             /usr/sbin/sshd -D"
+
+  iot-router-2:
+    image: alpine:latest
+    container_name: iot-router-2
+    hostname: iot-router-2
+    networks:
+      botnet:
+        ipv4_address: 172.20.0.104
+    ports:
+      - "22" # SSH
+      - "23" # Telnet
+    command: >
+      sh -c "apk add --no-cache openssh busybox-extras &&
+             echo -e 'admin:admin' | chpasswd &&
+             sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config &&
+             ssh-keygen
